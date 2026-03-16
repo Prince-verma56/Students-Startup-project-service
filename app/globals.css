@@ -2,6 +2,16 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+* {
+  cursor: none !important;
+}
+
+input,
+textarea,
+select {
+  cursor: text !important;
+}
+
 /* Custom Fonts */
 @font-face {
   font-family: "Chocolate Adventure";
@@ -82,7 +92,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  
+
   /* Custom Font Families - Use as font-chocolate, font-florish, etc. */
   --font-chocolate: "Chocolate Adventure", cursive;
   --font-florish: "florishabold", serif;
@@ -261,4 +271,22 @@
 
 .nav-item-mobile {
   animation: slideInNav 0.3s ease backwards;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.animated-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.animated-word {
+  opacity: 0;
+  transform: translate3d(0, 40px, -80px) rotateY(25deg) rotateX(-10deg);
+  transform-origin: center;
+  will-change: transform, opacity;
+  display: inline-block;
 }

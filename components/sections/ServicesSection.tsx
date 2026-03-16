@@ -8,8 +8,6 @@ import { useGSAP } from '@gsap/react'
 import CardFlip from '../kokonutui/card-flip'
 import AnimatedTitle from '../AnimatedTitle'
 
-gsap.registerPlugin(ScrollTrigger)
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Tier {

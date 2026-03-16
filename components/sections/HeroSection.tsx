@@ -8,8 +8,6 @@ import { useGSAP } from '@gsap/react'
 import SlideTextButton from '../kokonutui/slide-text-button'
 import { Link2Icon } from 'lucide-react'
 
-gsap.registerPlugin(ScrollTrigger)
-
 const HeroModelCanvas = dynamic(() => import('../three/HeroModelCanvas'), {
     ssr: false,
     loading: () => (

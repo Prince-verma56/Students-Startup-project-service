@@ -11,7 +11,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "services", label: "Services" },
-  { id: "demo Projects", label: "demo Projects" },
+  { id: "demo", label: "Demo Projects" },
   { id: "how_it_works", label: "How it Works" },
   { id: "req_a_project", label: "Req. a Project" },
   { id: "telegram", label: "Telegram" },
@@ -60,7 +60,6 @@ const Header: React.FC = () => {
         "fixed top-0 left-0 w-full z-50 transition-colors duration-500 px-4 md:px-6 lg:px-12",
         hasScrolled ? "bg-white/20 backdrop-blur" : "bg-transparent",
       ].join(" ")}
-      initial={{ y: -60, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
     >
@@ -86,7 +85,7 @@ const Header: React.FC = () => {
                 key={item.id}
                 onClick={() => scrollToId(item.id)}
                 className={`nav-link relative pb-1 cursor-pointer transition-opacity duration-300
-                  ${isActive ? "opacity-100 font-semibold" : "opacity-50 hover:opacity-90"}`}
+                  ${isActive ? "opacity-100 font-semibold text-cyan-800" : "opacity-50 hover:opacity-90"}`}
                 aria-label={item.label}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isActive ? 1 : 0.5 }}
@@ -96,7 +95,7 @@ const Header: React.FC = () => {
                 {isActive && (
                   <motion.span
                     layoutId="nav-active-pill"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-current rounded-full"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-current rounded-full "
                     initial={false}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
