@@ -4,26 +4,25 @@ import { motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ExternalLink, Github } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CARD_W         = 300    // card width px
-const CARD_GAP       = 80     // gap between cards px
-const CARD_STRIDE    = CARD_W + CARD_GAP  // total slot width per card
-const AUTO_PX        = 0.55   // auto-scroll px per frame
-const EASE           = 0.072  // lerp smoothness (lower = silkier)
-const WHEEL_SENS     = 0.5    // wheel scroll sensitivity
-const EXPAND_STAGGER = 0.09   // seconds between cards fanning out
-const EXPAND_DELAY   = 500    // ms after viewport entry
+const CARD_W         = 300
+const CARD_GAP       = 80
+const CARD_STRIDE    = CARD_W + CARD_GAP
+const AUTO_PX        = 0.55
+const EASE           = 0.072
+const WHEEL_SENS     = 0.5
+const EXPAND_STAGGER = 0.09
+const EXPAND_DELAY   = 500
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-
 interface Project {
   id: string
   title: string
@@ -106,25 +105,16 @@ function StackPreview() {
 
 // ── Single card ───────────────────────────────────────────────────────────────
 function ProjectCard({
-  project,
-  index,
-  isExpanded,
-  skew,
+  project, index, isExpanded, skew,
 }: {
-  project: Project
-  index: number
-  isExpanded: boolean
-  skew: number
+  project: Project; index: number; isExpanded: boolean; skew: number
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 40, scale: 0.86 }}
       animate={isExpanded ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 40, scale: 0.86 }}
       transition={{
-        type: "spring",
-        stiffness: 160,
-        damping: 22,
-        mass: 1.05,
+        type: "spring", stiffness: 160, damping: 22, mass: 1.05,
         delay: isExpanded ? index * EXPAND_STAGGER : 0,
         opacity: { duration: 0.4, ease: "easeOut", delay: isExpanded ? index * EXPAND_STAGGER : 0 },
       }}
@@ -135,7 +125,6 @@ function ProjectCard({
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         boxShadow: "0 2px 0 1px rgba(0,0,0,0.03),0 8px 24px rgba(0,0,0,0.08),0 20px 40px rgba(0,0,0,0.05)",
-        // Speed-based skew — cards lean with scroll direction
         transform: `skewX(${Math.max(-5, Math.min(5, skew * -0.7))}deg)`,
         transition: "transform 0.25s ease, box-shadow 0.4s ease",
         willChange: "transform",
@@ -150,8 +139,8 @@ function ProjectCard({
           style={{ transition: "transform 0.6s ease" }}
           loading="lazy"
           draggable={false}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1.06)" }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1)" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1.06)" }}
+          onMouseLeave={e => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1)" }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/12 via-transparent to-white/8 pointer-events-none" />
       </div>
@@ -160,12 +149,9 @@ function ProjectCard({
       <div className="p-5 flex flex-col gap-2.5 flex-1">
         {/* Tags */}
         <div className="flex gap-1.5 flex-wrap">
-          {project.tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border-0 font-semibold tracking-wide"
-            >
+          {project.tags.map(tag => (
+            <Badge key={tag} variant="secondary"
+              className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border-0 font-semibold tracking-wide">
               {tag}
             </Badge>
           ))}
@@ -186,9 +172,8 @@ function ProjectCard({
           {project.description}
         </p>
 
-        {/* Buttons */}
+        {/* Buttons — IDENTICAL to original */}
         <div className="flex gap-2 mt-auto pt-1.5">
-          {/* Live Demo — Next.js Link for internal, regular anchor for external */}
           <a
             href={project.deployedUrl}
             target="_blank"
@@ -202,8 +187,6 @@ function ProjectCard({
             <ExternalLink className="w-3 h-3 flex-shrink-0 group-hover/btn:rotate-12 transition-transform duration-200" />
             <span>Live Demo</span>
           </a>
-
-          {/* GitHub */}
           <a
             href={project.githubUrl}
             target="_blank"
@@ -232,36 +215,24 @@ export default function CardStackExample({ className }: { className?: string }) 
   const trackRef     = useRef<HTMLDivElement>(null)
   const rafRef       = useRef<number | null>(null)
 
-  // All scroll state in a single ref — zero re-renders in the RAF loop
   const S = useRef({
-    pos:      0,      // current rendered position (lerped)
-    target:   0,      // where we are heading
-    prev:     0,      // previous frame pos (for speed/skew)
-    auto:     false,  // is auto-belt running
-    dragging: false,
-    dragX:    0,
-    dragBase: 0,
-    hasDragged: false,
+    pos: 0, target: 0, prev: 0,
+    auto: false, dragging: false,
+    dragX: 0, dragBase: 0, hasDragged: false,
   })
 
-  const inView    = useInView(containerRef, { once: true, margin: "-8%" })
-  const DECK      = projects.length * CARD_STRIDE   // one full deck width
+  const inView = useInView(containerRef, { once: true, margin: "-8%" })
+  const DECK   = projects.length * CARD_STRIDE
 
-  // Seamless wrap: keep pos in [-DECK, 0)
-  // Key insight: we ONLY wrap pos; target follows by the same delta
-  // This means lerp never sees a jump — it always chases smoothly
+  // Seamless wrap — shift BOTH pos AND target so lerp never sees a jump
   function wrapPos(delta: number = 0) {
     const s = S.current
-    s.pos    += delta
-    s.target += delta
-    s.prev   += delta
+    s.pos += delta; s.target += delta; s.prev += delta
   }
 
-  // Write transform directly to DOM — never touches React state
   function paint(x: number) {
-    if (trackRef.current) {
+    if (trackRef.current)
       trackRef.current.style.transform = `translateX(${x}px)`
-    }
   }
 
   // ── Expand on viewport entry ──────────────────────────────────────────────
@@ -274,8 +245,6 @@ export default function CardStackExample({ className }: { className?: string }) 
   // ── RAF loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isExpanded) return
-
-    // Wait for spring settle before belt starts
     const beltDelay = projects.length * EXPAND_STAGGER * 1000 + 700
 
     const timer = setTimeout(() => {
@@ -283,32 +252,19 @@ export default function CardStackExample({ className }: { className?: string }) 
 
       const tick = () => {
         const s = S.current
-
-        // Auto-advance
-        if (s.auto && !s.dragging) {
-          s.target -= AUTO_PX
-        }
-
-        // Lerp pos toward target — this is the smoothness magic
+        if (s.auto && !s.dragging) s.target -= AUTO_PX
         s.pos = lerp(s.pos, s.target, EASE)
 
-        // Seamless wrap — shift both pos AND target by +DECK when pos < -DECK
-        // Because we shift both equally, lerp never sees a discontinuity
+        // Seamless infinite wrap — both pos and target shift together
         if (s.pos < -DECK) wrapPos(DECK)
         if (s.pos > 0)     wrapPos(-DECK)
 
-        // Speed delta for skew
         const spd = s.pos - s.prev
         s.prev = s.pos
-
         paint(s.pos)
-
-        // Update skew state (throttled — only on meaningful change)
-        setSkew((prev) => Math.abs(spd - prev) > 0.02 ? spd : prev)
-
+        setSkew(prev => Math.abs(spd - prev) > 0.02 ? spd : prev)
         rafRef.current = requestAnimationFrame(tick)
       }
-
       rafRef.current = requestAnimationFrame(tick)
     }, beltDelay)
 
@@ -333,40 +289,51 @@ export default function CardStackExample({ className }: { className?: string }) 
   // ── Pointer handlers ──────────────────────────────────────────────────────
   const onEnter = () => { S.current.auto = false }
   const onLeave = () => { S.current.dragging = false; S.current.auto = true }
-
-  const onDown = (e: React.PointerEvent) => {
-    // Only start drag on the track itself — not on buttons/links
+  const onDown  = (e: React.PointerEvent) => {
     const tag = (e.target as HTMLElement).tagName.toLowerCase()
     if (tag === "a" || tag === "button" || (e.target as HTMLElement).closest("a,button")) return
-    S.current.dragging  = true
-    S.current.dragX     = e.clientX
-    S.current.dragBase  = S.current.target
+    S.current.dragging = true
+    S.current.dragX    = e.clientX
+    S.current.dragBase = S.current.target
     S.current.hasDragged = false
   }
-
   const onMove = (e: React.PointerEvent) => {
     if (!S.current.dragging) return
     const delta = e.clientX - S.current.dragX
-    // Only count as a real drag after 5px of movement
     if (Math.abs(delta) > 5) S.current.hasDragged = true
     S.current.target = S.current.dragBase + delta
   }
-
   const onUp = () => { S.current.dragging = false }
 
   // ── Track positioning ─────────────────────────────────────────────────────
-  // We render 5 copies. Copy index 2 (middle) is the one visible on load.
-  // left offset = place copy[2]'s first card at the horizontal centre of the container
-  const COPIES    = 5
-  const copies    = Array.from({ length: COPIES }, (_, i) => i)
-  const midCopy   = Math.floor(COPIES / 2)   // = 2
-  // left = 50% of container - (midCopy decks + half card) so copy[2][0] starts centred
-  const trackLeft = `calc(50% - ${midCopy * DECK + CARD_W / 2}px)`
+  // FIX: start cards from LEFT edge instead of center.
+  //
+  // We render 5 copies for seamless infinite loop.
+  // trackLeft positions the LEFT edge of copy[0] at x=0 (left of screen),
+  // with 2 extra decks of runway BEHIND (left) for wrapping.
+  //
+  // Breakdown:
+  //   - COPIES = 5, each DECK = 6 cards * CARD_STRIDE wide
+  //   - We place copy[2] starting at left=0 so on load the first
+  //     card of copy[2] appears at the left edge
+  //   - The track `left` CSS is fixed; GSAP translates it leftward over time
+  //   - When pos < -DECK, we wrapPos(+DECK) to jump seamlessly
+  //
+  // trackLeft = -(midCopy * DECK) places copy[0] far left,
+  // copy[1] one DECK in, copy[2] at 0 (visible left edge), etc.
+  const COPIES  = 5
+  const midCopy = Math.floor(COPIES / 2) // = 2
+  // copies[midCopy] starts at x=0 (left edge of container)
+  // so trackLeft positions the whole track so copy[2]'s first card = left edge
+  const trackLeft = -(midCopy * DECK)
 
   return (
     <div
       ref={containerRef}
-      className={cn("relative w-full overflow-hidden select-none", className)}
+      className={cn(
+        "relative w-full overflow-hidden select-none",
+        className
+      )}
       style={{
         height: isExpanded ? 520 : 360,
         transition: "height 1s cubic-bezier(0.22,1,0.36,1)",
@@ -388,8 +355,9 @@ export default function CardStackExample({ className }: { className?: string }) 
         {!isExpanded && <StackPreview />}
       </motion.div>
 
-      {/* Fade masks */}
-      <div className="absolute inset-y-0 left-0 w-36 bg-gradient-to-r from-white via-white/20 to-transparent z-20 pointer-events-none" />
+      {/* Left fade — very thin so first card is visible from edge */}
+      <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
+      {/* Right fade */}
       <div className="absolute inset-y-0 right-0 w-36 bg-gradient-to-l from-white via-white/20 to-transparent z-20 pointer-events-none" />
 
       {/* Scrolling belt */}
@@ -397,14 +365,15 @@ export default function CardStackExample({ className }: { className?: string }) 
         ref={trackRef}
         className="absolute top-0 flex items-start"
         style={{
-          left: trackLeft,
+          // Fixed CSS left = trackLeft (px number, not calc string)
+          left: `${trackLeft}px`,
           gap: `${CARD_GAP}px`,
           paddingTop: 20,
           paddingBottom: 20,
           willChange: "transform",
         }}
       >
-        {copies.map((copyIdx) => (
+        {Array.from({ length: COPIES }, (_, copyIdx) => (
           <div
             key={copyIdx}
             className="flex flex-shrink-0"
@@ -414,7 +383,7 @@ export default function CardStackExample({ className }: { className?: string }) 
               <ProjectCard
                 key={`${copyIdx}-${project.id}`}
                 project={project}
-                // Only stagger the centre copy — others appear instantly
+                // Only stagger the centre copy on first expand
                 index={copyIdx === midCopy ? i : 999}
                 isExpanded={isExpanded}
                 skew={skew}

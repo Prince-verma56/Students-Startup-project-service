@@ -19,7 +19,7 @@ const AnimatedTitle: React.FC<AnimatedTitleProps> = ({ title, containerClass }) 
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: containerRef.current,
-          start: '100 bottom',
+          start: 'top 90%', // More robust start point
           end: 'center bottom',
           toggleActions: 'play none none reverse',
         },

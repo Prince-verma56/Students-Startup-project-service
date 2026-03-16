@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "motion/react";
 
 type NavItem = {
   id: string;
@@ -10,29 +10,60 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "services", label: "Services" },
-  { id: "demo", label: "Demo Projects" },
-  { id: "how_it_works", label: "How it Works" },
+  { id: "services",      label: "Services"       },
+  { id: "demo",          label: "Demo Projects"  },
+  { id: "how_it_works",  label: "How it Works"   },
   { id: "req_a_project", label: "Req. a Project" },
-  { id: "telegram", label: "Telegram" },
-  { id: "why_trust_me", label: "Why Trust me" },
+  { id: "telegram",      label: "Telegram"       },
+  { id: "why_trust_me",  label: "Why Trust me"   },
 ];
 
 const Header: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen,      setIsOpen]      = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
-  const [activeId, setActiveId] = useState<string>("");
+  const [activeId,    setActiveId]    = useState<string>("");
+  const [hidden,      setHidden]      = useState(false);   // ← new: hide/show state
 
-  useEffect(() => {
-    const onScroll = () => setHasScrolled(window.scrollY > 32);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const lastScrollY  = useRef(0);
+  const ticking      = useRef(false);
 
+  // ── Scroll direction detection ──────────────────────────────────────────────
   useEffect(() => {
-    const ids = NAV_ITEMS.map((i) => i.id);
+    const onScroll = () => {
+      if (ticking.current) return
+      ticking.current = true
+
+      requestAnimationFrame(() => {
+        const current = window.scrollY
+        const diff    = current - lastScrollY.current
+
+        // Only start hiding after 80px so it doesn't trigger on tiny bounces
+        if (current > 80) {
+          if (diff > 4) {
+            setHidden(true)           // scrolling down → hide
+            setIsOpen(false)          // close mobile drawer too
+          } else if (diff < -4) {
+            setHidden(false)          // scrolling up → show
+          }
+        } else {
+          setHidden(false)            // always show near top
+        }
+
+        setHasScrolled(current > 32)
+        lastScrollY.current = current
+        ticking.current     = false
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // ── Active section tracking ─────────────────────────────────────────────────
+  useEffect(() => {
+    const ids      = NAV_ITEMS.map((i) => i.id);
     const observers: IntersectionObserver[] = [];
+
     ids.forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -43,6 +74,7 @@ const Header: React.FC = () => {
       obs.observe(el);
       observers.push(obs);
     });
+
     return () => observers.forEach((o) => o.disconnect());
   }, []);
 
@@ -57,14 +89,25 @@ const Header: React.FC = () => {
   return (
     <motion.header
       className={[
-        "fixed top-0 left-0 w-full z-50 transition-colors duration-500 px-4 md:px-6 lg:px-12",
+        "fixed top-0 left-0 w-full z-[100] transition-colors duration-500 px-4 md:px-6 lg:px-12",
         hasScrolled ? "bg-white/20 backdrop-blur" : "bg-transparent",
       ].join(" ")}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+      // Mount animation (first load) — slides down from above
+      initial={{ y: -60, opacity: 0 }}
+      animate={{
+        y:       hidden ? "-100%" : 0,
+        opacity: hidden ? 0       : 1,
+      }}
+      transition={{
+        // First load uses slow cinematic ease
+        // Hide/show uses faster spring so it feels snappy and responsive
+        y:       { type: "spring", stiffness: 260, damping: 28, mass: 0.8 },
+        opacity: { duration: 0.25 },
+      }}
     >
       <div className="mx-auto px-2 md:px-4 h-16 md:h-14 mt-12 flex items-center justify-between gap-4">
 
+        {/* Logo */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -77,6 +120,7 @@ const Header: React.FC = () => {
           </Link>
         </motion.div>
 
+        {/* Desktop nav */}
         <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8 font-florish text-sm xl:text-base">
           {NAV_ITEMS.map((item, index) => {
             const isActive = activeId === item.id;
@@ -85,7 +129,9 @@ const Header: React.FC = () => {
                 key={item.id}
                 onClick={() => scrollToId(item.id)}
                 className={`nav-link relative pb-1 cursor-pointer transition-opacity duration-300
-                  ${isActive ? "opacity-100 font-semibold text-cyan-800" : "opacity-50 hover:opacity-90"}`}
+                  ${isActive
+                    ? "opacity-100 font-semibold text-cyan-800"
+                    : "opacity-50 hover:opacity-90"}`}
                 aria-label={item.label}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isActive ? 1 : 0.5 }}
@@ -95,7 +141,7 @@ const Header: React.FC = () => {
                 {isActive && (
                   <motion.span
                     layoutId="nav-active-pill"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-current rounded-full "
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-current rounded-full"
                     initial={false}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
@@ -105,6 +151,7 @@ const Header: React.FC = () => {
           })}
         </nav>
 
+        {/* Hamburger */}
         <motion.button
           className="lg:hidden p-2 rounded-full border border-gray-300 flex-shrink-0 hover:bg-gray-100 transition-colors flex flex-col justify-center items-center"
           aria-label="Toggle menu"
@@ -122,6 +169,7 @@ const Header: React.FC = () => {
         </motion.button>
       </div>
 
+      {/* Mobile drawer */}
       <AnimatePresence>
         {isOpen && (
           <motion.div

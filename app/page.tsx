@@ -11,6 +11,7 @@ import TelegramSection from '@/components/sections/TelegramSection'
 import WhyTrustSection from '@/components/sections/WhyTrustSection'
 import Header from '../components/Navbar'
 import { SmoothCursor } from '@/components/ui/smooth-cursor'
+import ScrollCascadeText from '@/components/ScrollCascadeText'
 
 
 function page() {
@@ -36,9 +37,17 @@ function page() {
         <motion.section id="demo Projects" {...motionProps}>
           <DemoSection />
         </motion.section>
-        <motion.section id="how_it_works" {...motionProps}>
+        {/* GSAP section should manage its own visibility or be visible by default */}
+        <section id="how_it_works">
           <HowItWorksSection />
-        </motion.section>
+          {/* <ScrollCascadeText
+            id="why_trustme"
+            eyebrow="Why Trust Me"
+            words={["CLEAN", "REAL", "CODE."]}
+            paragraph="Not generated. Not copy-pasted. Every line written with intention."
+            sub="Delivered with documentation, source access, and a working demo."
+          /> */}
+        </section>
         <motion.section id="req_a_project" {...motionProps}>
           <ReqProjectSection />
         </motion.section>
