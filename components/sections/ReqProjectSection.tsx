@@ -129,7 +129,7 @@ function StepBar({ current }:{ current:number }) {
               </span>
             </div>
             {i < STEPS.length-1 && (
-              <motion.div className="flex-1 h-[2px] mx-2 mb-5 rounded-full"
+              <motion.div className="flex-1 h-0.5 mx-2 mb-5 rounded-full"
                 animate={{ background: done ? `linear-gradient(90deg,${T.accent},${T.ink})` : T.border }}
                 transition={{ duration:0.4 }}
               />
@@ -156,7 +156,7 @@ function FeatureChip({ label,Icon,bg,ic,selected,onClick }:{
         color:        selected ? "#fff" : T.ink,
       }}
     >
-      <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+      <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
         style={{ background: selected ? "rgba(255,255,255,0.15)" : bg }}>
         <Icon size={10} style={{ color: selected ? "rgba(255,255,255,0.9)" : ic }} strokeWidth={2.5}/>
       </span>
@@ -181,7 +181,7 @@ function FeatureSelector({ selected,onAdd,onRemove }:{
 
   return (
     <div className="space-y-3">
-      <div className="min-h-[56px] p-3 flex flex-wrap gap-1.5 items-start transition-colors duration-200"
+      <div className="min-h-14 p-3 flex flex-wrap gap-1.5 items-start transition-colors duration-200"
         style={{
           borderRadius:16,
           border:`2px dashed ${selected.length>0?"rgba(26,31,46,0.18)":"rgba(26,31,46,0.10)"}`,
@@ -349,7 +349,7 @@ function SuccessScreen({ onReset }:{ onReset:()=>void }) {
 
       <motion.div initial={{ opacity:0,y:10 }} animate={{ opacity:1,y:0 }} transition={{ delay:0.25 }}>
         <h4 className="font-neulis font-black text-2xl mb-2" style={{ color:T.ink }}>Request sent! ⚡</h4>
-        <p className="text-sm font-robert leading-relaxed max-w-[240px] mx-auto" style={{ color:T.sub }}>
+        <p className="text-sm font-robert leading-relaxed max-w-60 mx-auto" style={{ color:T.sub }}>
           I&apos;ll personally review and reply within 12 hours.
         </p>
       </motion.div>
@@ -457,7 +457,7 @@ export default function RequestProjectSection() {
   }
 
   const cpHint = { telegram:"@yourusername", email:"you@email.com", whatsapp:"+91 XXXXX XXXXX" }
-  const LB = "font-robert text-[10px] font-bold tracking-widest uppercase block mb-1.5"
+  const LB = "font-robert text-[10px] font-bold tracking-[0.3em] uppercase block mb-1.5"
 
   return (
     <section id="req_a_project" className="relative w-full py-24 px-4"
@@ -537,15 +537,15 @@ export default function RequestProjectSection() {
       <motion.div className="text-center mb-14 flex flex-col items-center gap-3"
         initial={{ opacity:0,y:22 }} whileInView={{ opacity:1,y:0 }}
         viewport={{ once:true }} transition={{ duration:0.7,ease:[0.22,1,0.36,1] }}>
-        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-robert font-bold tracking-widest uppercase"
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-robert font-bold tracking-[0.3em] uppercase"
           style={{ background:"rgba(26,31,46,0.06)", color:T.ink, border:`1px solid rgba(26,31,46,0.10)` }}>
           <Sparkles size={10}/> Let&apos;s Build Together
         </span>
-        <h2 className="font-neulis font-black leading-none tracking-tight text-[clamp(2.4rem,5vw,4.5rem)]"
+        <h2 className="font-florish leading-none tracking-tight text-[clamp(2.4rem,5vw,4.5rem)]"
           style={{ color:T.ink }}>
           Request a Project
         </h2>
-        <p className="text-sm font-robert max-w-xs leading-relaxed" style={{ color:T.sub }}>
+        <p className="text-sm font-robert font-light max-w-xs leading-relaxed" style={{ color:T.sub }}>
           3 quick steps — personal reply within 12 hours.
         </p>
       </motion.div>
@@ -576,7 +576,7 @@ export default function RequestProjectSection() {
             <div className="flex flex-col gap-4 flex-1 mb-8">
               {PERKS.map(p=>(
                 <div key={p.title} className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
+                  <div className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0"
                     style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.08)", color:"rgba(255,255,255,0.5)" }}>
                     <p.Icon size={13} strokeWidth={2}/>
                   </div>
@@ -590,7 +590,7 @@ export default function RequestProjectSection() {
 
             <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl"
               style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)" }}>
-              <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background:T.accent }}/>
+              <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background:T.accent }}/>
               <span className="text-[11px] font-robert" style={{ color:"rgba(255,255,255,0.45)" }}>
                 <strong className="font-bold text-white">Accepting projects</strong> — 12 hr reply
               </span>
@@ -628,7 +628,7 @@ export default function RequestProjectSection() {
                           {PROJECT_TYPES.map(t=>(
                             <SelectItem key={t.value} value={t.value} className="font-robert text-sm py-2.5 cursor-pointer">
                               <span className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:t.dot }}/>
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background:t.dot }}/>
                                 <span className="font-bold" style={{ color:T.ink }}>{t.full}</span>
                                 <span className="text-xs" style={{ color:T.muted }}>— {t.sub}</span>
                               </span>

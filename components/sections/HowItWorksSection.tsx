@@ -79,7 +79,7 @@ function TiltCard({ children, className = "", style }: {
 function StepGap({ stepNum, children }: { stepNum: string; children?: React.ReactNode }) {
   return (
     // ✅ z-20 so gap content sits above FloatingShapes (z-5)
-    <div className="progress-arrow relative z-20 flex-shrink-0 flex flex-col items-center justify-center gap-4 px-6"
+    <div className="progress-arrow relative z-20 shrink-0 flex flex-col items-center justify-center gap-4 px-6"
       style={{ width: "18vw" }}>
       <span className="font-neulis font-black leading-none select-none"
         style={{ fontSize: "clamp(4rem,7vw,6.5rem)", color: "transparent", WebkitTextStroke: "2px #c7d2fe" }}>
@@ -87,7 +87,7 @@ function StepGap({ stepNum, children }: { stepNum: string; children?: React.Reac
       </span>
       {children}
       <div className="flex items-center gap-2 mt-1">
-        <div className="h-px bg-gradient-to-r from-transparent via-indigo-300 to-indigo-400" style={{ width: 48 }} />
+        <div className="h-px bg-linear-to-r from-transparent via-indigo-300 to-indigo-400" style={{ width: 48 }} />
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
           <path d="M2 8h12M9 3l5 5-5 5" stroke="#818cf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -98,7 +98,7 @@ function StepGap({ stepNum, children }: { stepNum: string; children?: React.Reac
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="border-indigo-100/60 bg-gradient-to-br from-indigo-50/90 to-white/95 shadow-sm">
+    <Card className="border-indigo-100/60 bg-linear-to-br from-indigo-50/90 to-white/95 shadow-sm">
       <CardContent className="px-4 py-3 text-center">
         <p className="text-[10px] text-indigo-400 font-robert font-bold tracking-wider uppercase mb-0.5">{label}</p>
         <p className="text-xl font-black text-zinc-900 font-neulis leading-none">{value}</p>
@@ -155,13 +155,39 @@ export default function HowItWorksSection() {
 
     // Pin at the trackWrap div so heading scrolls past first
     const pinTrigger = trackWrapRef.current ?? section
+    
+    // Smooth heading transition — fades out as we hit the pin
+    gsap.fromTo(".howitworks-heading", 
+      { opacity: 1, y: 0 },
+      {
+        opacity: 0,
+        y: -40,
+        ease: "none",
+        scrollTrigger: {
+          trigger: pinTrigger,
+          start: "top 25%", // Start fading earlier
+          end: "top top",
+          scrub: true,
+        }
+      }
+    )
+
     const hTween = gsap.to(track, {
       x: -totalScroll, ease: "none",
       scrollTrigger: {
-        trigger: pinTrigger, start: "top top",
+        trigger: pinTrigger,
+        start: "top top", // Reverting to top top for cleaner alignment
         end: () => `+=${totalScroll}`,
-        scrub: 1, pin: true, anticipatePin: 1,
-        invalidateOnRefresh: true, fastScrollEnd: true,
+        scrub: 1,
+        pin: true,
+        pinSpacing: true,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        fastScrollEnd: true,
+        // Ensure the section is fully visible when pinned
+        onEnter:     () => gsap.set(section, { opacity: 1, visibility: "visible" }),
+        onLeave:     () => gsap.to(section, { opacity: 0, duration: 0.2 }),
+        onEnterBack: () => gsap.to(section, { opacity: 1, duration: 0.2 }),
       },
     })
 
@@ -169,7 +195,7 @@ export default function HowItWorksSection() {
 
     gsap.to(section, {
       backgroundColor: "#eef2ff", ease: "none",
-      scrollTrigger: { trigger: pinTrigger, start: "top top", end: () => `+=${totalScroll * 0.65}`, scrub: 1 },
+      scrollTrigger: { trigger: pinTrigger, start: "top+=1 top", end: () => `+=${totalScroll * 0.65}`, scrub: 1 },
     })
     gsap.to(section, {
       backgroundColor: "#ffffff", ease: "none",
@@ -179,21 +205,54 @@ export default function HowItWorksSection() {
     // Airplane
     const planeEl = airplaneRef.current
     if (planeEl) {
+      // 1. Horizontal movement synchronized with the horizontal scroll
       gsap.to(planeEl, {
-        x: track.scrollWidth - 180, ease: "none",
-        scrollTrigger: { trigger: pinTrigger, start: "top top", end: () => `+=${totalScroll}`, scrub: 0.8 },
+        x: track.scrollWidth - 180, 
+        ease: "none",
+        scrollTrigger: { 
+          trigger: pinTrigger, 
+          start: "top top", 
+          end: () => `+=${totalScroll}`, 
+          scrub: 1, // Matches track scrub for perfect sync
+          invalidateOnRefresh: true,
+        },
       })
-      gsap.to(planeEl, { y: "-=28", ease: "sine.inOut", yoyo: true, repeat: -1, duration: 2.2 })
-      gsap.to(planeEl, { rotation: -6, ease: "sine.inOut", yoyo: true, repeat: -1, duration: 3.1 })
+
+      // 2. Idle animations (independent of scroll)
+      gsap.to(planeEl, { 
+        y: "-=25", 
+        ease: "sine.inOut", 
+        yoyo: true, 
+        repeat: -1, 
+        duration: 2.2 
+      })
+      gsap.to(planeEl, { 
+        rotation: -4, 
+        ease: "sine.inOut", 
+        yoyo: true, 
+        repeat: -1, 
+        duration: 3.1 
+      })
+
+      // 3. Scene-specific altitude and rotation changes
+      // These will be additive to the base horizontal movement
       ;[
-        { trigger: ".scene-1", y: -10, rot:  3 },
-        { trigger: ".scene-2", y: -45, rot: -8 },
-        { trigger: ".scene-3", y: -20, rot:  5 },
-        { trigger: ".scene-4", y: -60, rot: -12 },
+        { trigger: ".scene-1", y: -15, rot:  4 },
+        { trigger: ".scene-2", y: -50, rot: -10 },
+        { trigger: ".scene-3", y: -25, rot:  6 },
+        { trigger: ".scene-4", y: -70, rot: -15 },
       ].forEach(({ trigger, y, rot }) => {
         gsap.to(planeEl, {
-          y, rotation: rot, ease: "power2.inOut",
-          scrollTrigger: { trigger, containerAnimation: hTween, start: "left 80%", end: "left 20%", scrub: 1.5 },
+          y, 
+          rotation: rot, 
+          ease: "power2.inOut",
+          scrollTrigger: { 
+            trigger, 
+            containerAnimation: hTween, 
+            start: "left 85%", 
+            end: "left 15%", 
+            scrub: 1.2 
+          },
         })
       })
     }
@@ -319,7 +378,7 @@ export default function HowItWorksSection() {
           { step:"04", title:"Delivered. Done.",        desc:"Code + deployment + docs. Handed over clean.",         icon:"🚀" },
         ].map((s) => (
           <div key={s.step} className="scene-mobile flex gap-4 items-start">
-            <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl">{s.icon}</div>
+            <div className="shrink-0 w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl">{s.icon}</div>
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-500 font-robert uppercase">Step {s.step}</span>
               <h3 className="text-xl font-black text-zinc-900 leading-tight font-neulis">{s.title}</h3>
@@ -332,7 +391,7 @@ export default function HowItWorksSection() {
       {/* ── DESKTOP heading: sits in normal flow ABOVE the pinned track ─────── */}
       {/* This div is the scroll trigger anchor — GSAP pins the section */}
       {/* The heading scrolls away naturally before the pin kicks in */}
-      <div className="hidden md:flex flex-col items-center gap-3 pt-16 pb-8 relative z-50 pointer-events-none">
+      <div className="howitworks-heading hidden md:flex flex-col items-center gap-3 pt-16 pb-8 relative z-50 pointer-events-none">
         <Badge variant="secondary" className="bg-indigo-50 text-indigo-500 border-indigo-100 font-robert text-[10px] tracking-[0.2em] uppercase pointer-events-auto">
           The Process
         </Badge>
@@ -359,12 +418,17 @@ export default function HowItWorksSection() {
         <div
           ref={airplaneRef}
           className="absolute z-30 pointer-events-none"
-          style={{ top: "62%", left: 32, willChange: "transform",
-            filter: "drop-shadow(4px 8px 12px rgba(0,0,0,0.18))" }}
+          style={{ 
+            top: "55%", 
+            left: 0, 
+            transform: "translateX(32px)", 
+            willChange: "transform",
+            filter: "drop-shadow(4px 8px 12px rgba(0,0,0,0.18))" 
+          }}
         >
           <div className="absolute right-full top-1/2 -translate-y-1/2 flex items-center" style={{ width: 80 }}>
-            <div className="h-px w-full bg-gradient-to-l from-indigo-300/60 via-indigo-200/30 to-transparent" />
-            <div className="absolute top-1 h-px w-3/4 bg-gradient-to-l from-indigo-200/40 to-transparent translate-y-2" />
+            <div className="h-px w-full bg-linear-to-l from-indigo-300/60 via-indigo-200/30 to-transparent" />
+            <div className="absolute top-1 h-px w-3/4 bg-linear-to-l from-indigo-200/40 to-transparent translate-y-2" />
           </div>
           {[0,1,2].map(i => (
             <div key={i} className="absolute rounded-full bg-white/50"
@@ -378,7 +442,7 @@ export default function HowItWorksSection() {
 
 
         {/* SCENE 1: z-20 */}
-        <div className="scene scene-1 relative z-20 flex-shrink-0 w-screen h-screen flex items-center px-[8vw] gap-12">
+        <div className="scene scene-1 relative z-20 shrink-0 w-screen h-screen flex items-center px-[8vw] gap-12">
           <div className="flex flex-col gap-5 max-w-[48vw]">
             <span className="text-[11px] font-bold tracking-[0.3em] text-indigo-500 font-robert uppercase">Step 01</span>
             <div className="s1-words flex flex-wrap items-end gap-x-4 gap-y-1 leading-none">
@@ -421,7 +485,7 @@ export default function HowItWorksSection() {
 
         {/* GAP 1→2 */}
         <StepGap stepNum="02">
-          <Card className="w-full border-indigo-100/60 bg-gradient-to-br from-indigo-50/90 to-white shadow-sm">
+          <Card className="w-full border-indigo-100/60 bg-linear-to-br from-indigo-50/90 to-white shadow-sm">
             <CardContent className="px-4 py-3 text-center">
               <p className="text-[10px] text-indigo-400 font-robert font-bold tracking-wider uppercase mb-1">Response time</p>
               <p className="text-2xl font-black text-zinc-900 font-neulis leading-none">{"< 2 hrs"}</p>
@@ -430,7 +494,7 @@ export default function HowItWorksSection() {
         </StepGap>
 
         {/* SCENE 2: z-20 */}
-        <div className="scene scene-2 relative z-20 flex-shrink-0 w-screen h-screen flex items-center px-[8vw] gap-10">
+        <div className="scene scene-2 relative z-20 shrink-0 w-screen h-screen flex items-center px-[8vw] gap-10">
           <div className="flex flex-col gap-5 max-w-[44vw]">
             <span className="text-[11px] font-bold tracking-[0.3em] text-indigo-500 font-robert uppercase">Step 02</span>
             <div className="s2-words flex flex-wrap items-end gap-x-3 gap-y-1 leading-none">
@@ -444,7 +508,7 @@ export default function HowItWorksSection() {
               {TECH.map(t => (
                 <span key={t.label} className="tech-badge inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border font-robert"
                   style={{ background:`${t.color}12`, color:t.color==="#000000"?"#18181b":t.color, borderColor:`${t.color}25` }}>
-                  <img src={t.icon} alt={t.label} width={13} height={13} className="flex-shrink-0" loading="lazy" />
+                  <img src={t.icon} alt={t.label} width={13} height={13} className="shrink-0" loading="lazy" />
                   {t.label}
                 </span>
               ))}
@@ -453,10 +517,10 @@ export default function HowItWorksSection() {
               ✦ Clean code. Real-world patterns.
             </Badge>
           </div>
-          <TiltCard className="mockup-card flex-shrink-0 w-60 rounded-3xl overflow-hidden border border-white/90"
+          <TiltCard className="mockup-card shrink-0 w-60 rounded-3xl overflow-hidden border border-white/90"
             style={{ background:"linear-gradient(150deg,rgba(255,255,255,0.92),rgba(238,242,255,0.85))",
               backdropFilter:"blur(20px)", boxShadow:"0 2px 0 1px rgba(0,0,0,0.03),0 12px 32px rgba(99,102,241,0.12),0 28px 56px rgba(0,0,0,0.08)" } as React.CSSProperties}>
-            <div className="h-32 bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center relative overflow-hidden">
+            <div className="h-32 bg-linear-to-br from-indigo-100 to-violet-100 flex items-center justify-center relative overflow-hidden">
               <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg" alt="" width={40} height={40} className="opacity-20 absolute left-3 bottom-2" loading="lazy" />
               <span className="text-3xl relative z-10">⚡</span>
             </div>
@@ -480,7 +544,7 @@ export default function HowItWorksSection() {
         </StepGap>
 
         {/* SCENE 3: z-20 */}
-        <div className="scene scene-3 relative z-20 flex-shrink-0 w-screen h-screen flex items-center px-[8vw] gap-14">
+        <div className="scene scene-3 relative z-20 shrink-0 w-screen h-screen flex items-center px-[8vw] gap-14">
           <div className="flex flex-col gap-7 max-w-[50vw]">
             <span className="text-[11px] font-bold tracking-[0.3em] text-indigo-500 font-robert uppercase">Step 03</span>
             <h2 className="s3-heading font-neulis font-black text-zinc-900 leading-[1.0] tracking-tight"
@@ -490,7 +554,7 @@ export default function HowItWorksSection() {
             <div className="flex flex-col gap-3">
               {["Live preview link shared instantly","Request unlimited revisions","Changes made within 24 hours","Sign off when it's perfect"].map((item,i) => (
                 <div key={i} className="check-item flex items-center gap-3 group cursor-default">
-                  <span className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-200">
+                  <span className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-200">
                     <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
                       <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -500,7 +564,7 @@ export default function HowItWorksSection() {
               ))}
             </div>
           </div>
-          <TiltCard className="s3-side flex-shrink-0 w-56 rounded-3xl overflow-hidden border border-indigo-100/60"
+          <TiltCard className="s3-side shrink-0 w-56 rounded-3xl overflow-hidden border border-indigo-100/60"
             style={{ background:"linear-gradient(150deg,rgba(238,242,255,0.95),rgba(255,255,255,0.90))", boxShadow:"0 8px 32px rgba(99,102,241,0.10)" } as React.CSSProperties}>
             <div className="p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -527,7 +591,7 @@ export default function HowItWorksSection() {
 
         {/* GAP 3→4 */}
         <StepGap stepNum="04">
-          <Card className="w-full border-indigo-100/60 bg-gradient-to-br from-indigo-50/90 to-white shadow-sm">
+          <Card className="w-full border-indigo-100/60 bg-linear-to-br from-indigo-50/90 to-white shadow-sm">
             <CardContent className="px-4 py-3 text-center">
               <p className="text-[10px] text-indigo-400 font-robert font-bold tracking-wider uppercase mb-1">Final step</p>
               <p className="text-base font-black text-zinc-900 font-neulis leading-snug">Almost<br />there 🎉</p>
@@ -536,7 +600,7 @@ export default function HowItWorksSection() {
         </StepGap>
 
         {/* SCENE 4: z-20 */}
-        <div className="scene scene-4 relative z-20 flex-shrink-0 w-screen h-screen flex items-center px-[8vw] overflow-hidden">
+        <div className="scene scene-4 relative z-20 shrink-0 w-screen h-screen flex items-center px-[8vw] overflow-hidden">
           <div className="absolute inset-0 pointer-events-none" aria-hidden>
             {PARTICLES.map((p,i) => (
               <span key={i} className="particle absolute rounded-full"

@@ -4,8 +4,8 @@ import CardStackExample from "../kokonutui/card-stack";
 import { motion } from "motion/react"
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import React, { useEffect, useRef } from 'react'
+// import { ScrollTrigger } from "gsap/ScrollTrigger";
+import React, { useRef } from 'react'
 export default function DemoSection() {
     const headingRef = useRef<HTMLDivElement>(null)
     const eyebrowRef = useRef<HTMLParagraphElement>(null)
@@ -76,7 +76,7 @@ export default function DemoSection() {
                     {/* Paragraph — GSAP scroll animation via ref */}
                     <p
                         ref={paraRef}
-                        className="text-base md:text-lg text-zinc-500 leading-relaxed max-w-[560px] mx-auto font-robert font-medium mt-6"
+                        className="text-base md:text-lg text-zinc-500 leading-relaxed max-w-140 mx-auto font-robert font-medium mt-6"
                         style={{ opacity: 1 }}
                     >
                         Choose a project tier that fits your needs.

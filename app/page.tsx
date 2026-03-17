@@ -7,11 +7,11 @@ import ServicesSection from '@/components/sections/ServicesSection'
 import DemoSection from '@/components/sections/DemoSection'
 import HowItWorksSection from '@/components/sections/HowItWorksSection'
 import ReqProjectSection from '@/components/sections/ReqProjectSection'
-import TelegramSection from '@/components/sections/TelegramSection'
-import WhyTrustSection from '@/components/sections/WhyTrustSection'
+import ReviewSection from '@/components/sections/ReviewSection'
+import ScrollCascadeText from '@/components/ScrollCascadeText'
+import SectionConnector from '@/components/SectionConnector'
 import Header from '../components/Navbar'
 import { SmoothCursor } from '@/components/ui/smooth-cursor'
-import ScrollCascadeText from '@/components/ScrollCascadeText'
 
 
 function page() {
@@ -19,7 +19,7 @@ function page() {
     initial: { opacity: 0, y: 20 },
     whileInView: { opacity: 1, y: 0 },
     viewport: { once: true, amount: 0.1, margin: "-50px" },
-    transition: { duration: 0.6, ease: "easeOut" }
+    transition: { duration: 0.6, ease: "easeOut" as const }
   }
 
   return (
@@ -31,32 +31,53 @@ function page() {
         <section id="hero">
           <HeroSection />
         </section>
-        <motion.section id="services" {...motionProps}>
+
+        <SectionConnector from="#EEF2FF" to="#F5F4F0" />
+
+        <ScrollCascadeText
+          id="why_trust_me"
+          eyebrow="Why Trust Me"
+          words={["CLEAN", "REAL", "CODE."]}
+          paragraph="Not generated. Every line written with intention."
+          sub="Source code, docs, and working demo — always included."
+        />
+
+        <SectionConnector from="#F5F4F0" to="#FFFFFF" />
+
+        <motion.section id="services" {...motionProps} className="pb-0">
           <ServicesSection />
         </motion.section>
+
+        <SectionConnector from="#FFFFFF" to="#FFFFFF" glow={false} />
+
         <motion.section id="demo Projects" {...motionProps}>
           <DemoSection />
         </motion.section>
-        {/* GSAP section should manage its own visibility or be visible by default */}
-        <section id="how_it_works">
+
+        <SectionConnector from="#FFFFFF" to="#FFFFFF" glow={false} />
+
+        <div id="howitworks-entry" style={{ height: 1 }} />
+        <section id="how_it_works" className="relative z-10">
           <HowItWorksSection />
-          {/* <ScrollCascadeText
-            id="why_trustme"
-            eyebrow="Why Trust Me"
-            words={["CLEAN", "REAL", "CODE."]}
-            paragraph="Not generated. Not copy-pasted. Every line written with intention."
-            sub="Delivered with documentation, source access, and a working demo."
-          /> */}
         </section>
-        <motion.section id="req_a_project" {...motionProps}>
-          <ReqProjectSection />
-        </motion.section>
-        <motion.section id="telegram" {...motionProps}>
-          <TelegramSection />
-        </motion.section>
-        <motion.section id="why_trust_me" {...motionProps}>
-          <WhyTrustSection />
-        </motion.section>
+        <div id="howitworks-exit" style={{ height: 1 }} />
+
+        <section id="req_a_project" className="relative z-20 bg-white">
+          <motion.section {...motionProps}>
+            <ReqProjectSection />
+          </motion.section>
+        </section>
+        
+        <section id="reviews" className="relative z-40 bg-[#FAFAFE]">
+          <motion.section {...motionProps}>
+            <ReviewSection />
+          </motion.section>
+        </section>
+
+        {/* Extra space at the very bottom to allow the last pinned section to complete */}
+        <div className="h-[150vh] bg-[#FAFAFE] relative z-50 flex items-end justify-center pb-20">
+          <p className="text-zinc-300 font-robert text-sm">© 2024 • Built with Intention</p>
+        </div>
       </main>
     </>
   )

@@ -14,9 +14,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: "demo",          label: "Demo Projects"  },
   { id: "how_it_works",  label: "How it Works"   },
   { id: "req_a_project", label: "Req. a Project" },
-  { id: "telegram",      label: "Telegram"       },
+  { id: "reviews",        label: "Reviews"},
   { id: "why_trust_me",  label: "Why Trust me"   },
 ];
+
+
 
 const Header: React.FC = () => {
   const [isOpen,      setIsOpen]      = useState(false);

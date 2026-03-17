@@ -1,4 +1,4 @@
-export default function TelegramSection() {
+export default function ReviewSection() {
     return (
         <div className="py-20 px-4">
             <div className="max-w-4xl mx-auto">
