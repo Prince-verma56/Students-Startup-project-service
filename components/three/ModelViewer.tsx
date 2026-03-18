@@ -46,6 +46,7 @@ const Model = memo(({ scrollRef }: { scrollRef: React.MutableRefObject<number> }
     </group>
   )
 })
+Model.displayName = "Model"
 
 // Use a simpler fallback that is guaranteed to show
 function LoadingBox() {
@@ -70,7 +71,7 @@ export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: 
         <ambientLight intensity={1.5} />
         <ambientLight intensity={2} />
         <directionalLight intensity={1.5} />
-       
+
 
 
         <pointLight position={[10, 10, 10]} intensity={2} />
@@ -84,6 +85,11 @@ export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: 
         <OrbitControls
           enableZoom={false}
           enablePan={false}
+          enableDamping={true}
+          dampingFactor={0.08}
+          minPolarAngle={Math.PI / 2}
+          maxPolarAngle={Math.PI / 2}
+          rotateSpeed={0.6}
         />
       </Canvas>
     </div>

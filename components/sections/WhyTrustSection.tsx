@@ -45,9 +45,15 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 gsap.registerPlugin(ScrollTrigger)
 
-import ModelViewer from "../three/ModelViewer"
+// ── ModelViewer — stable ref, never re-renders ────────────────────────────────
+// scrollProgressRef is a MutableRefObject → passed once → never changes → no remount
+const ModelViewer = dynamic(() => import("../three/ModelViewer"), {
+  ssr:     false,
+  loading: () => <ModelFallback />,
+})
 
-// Wrap in memo so ModelViewer doesn't re-render it when parent state changes
+// Wrap in memo so dynamic() doesn't re-render it when parent state changes
+// (the only state change is setReady once on mount — but memo is defensive)
 const StableModelViewer = memo(ModelViewer)
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -249,6 +255,8 @@ export default function WhyTrustSection() {
   const headEyeRef  = useRef<HTMLElement|null>(null)
   const headH1Ref   = useRef<HTMLElement|null>(null)
   const headAcRef   = useRef<HTMLElement|null>(null)
+  // Dot refs — direct DOM writes, zero setState
+  const dotRefs     = useRef<(HTMLDivElement|null)[]>([])
 
   // ── Minimal state — only fires once ──────────────────────────────────────
   const [ready, setReady] = useState(false)
@@ -383,6 +391,15 @@ export default function WhyTrustSection() {
           if(headH1Ref.current)  headH1Ref.current.textContent  = h.h1
           if(headAcRef.current)  headAcRef.current.textContent  = h.accent
 
+          // Update phase dots — direct DOM write, Apple-style pill expand
+          dotRefs.current.forEach((el, di) => {
+            if(!el) return
+            el.style.width      = di === newPhase ? "22px" : "6px"
+            el.style.background = di === newPhase
+              ? "#6366F1"
+              : "rgba(99,102,241,0.22)"
+          })
+
           // Hide scroll hint after phase 1
           if(newPhase > 0 && hintVisible) setHintVisible(false)
         }
@@ -488,8 +505,6 @@ export default function WhyTrustSection() {
   },[ready]) // eslint-disable-line react-hooks/exhaustive-deps
   // hintVisible intentionally excluded — see note in onUpdate
 
-  const dummyRef = useRef(0.5)
-
   return (
     <section
       ref={sectionRef}
@@ -559,7 +574,7 @@ export default function WhyTrustSection() {
         {/* ── Progress bar ───────────────────────────────────────────── */}
         <div aria-hidden style={{
           position:"absolute", bottom:0, left:0, right:0,
-          height:2, background:"rgba(99,102,241,0.1)", zIndex:6,
+          height:2, background:"rgba(99,102,241,0.08)", zIndex:6,
         }}>
           <div ref={progRef} style={{
             height:"100%", width:"0%",
@@ -582,8 +597,8 @@ export default function WhyTrustSection() {
             width:"clamp(300px,36vw,500px)",
             zIndex:2,
             background:"transparent",
-            pointerEvents:"auto",
-            // border: "5px solid red", // DEBUG BORDER
+            pointerEvents:"none",
+            // Promote to GPU layer — canvas already is but the wrapper too
             willChange:"transform",
           }}>
           <StableModelViewer scrollRef={scrollProgressRef}/>
@@ -800,12 +815,12 @@ export default function WhyTrustSection() {
           {[0,1,2,3].map(i=>(
             <div
               key={i}
-              className="wt-phase-dot"
-              data-idx={i}
+              ref={el=>{ dotRefs.current[i]=el }}
               style={{
                 borderRadius:3,
-                width:6, height:6,
-                background:"rgba(99,102,241,0.22)",
+                width: i===0 ? 22 : 6,   // first dot active on load
+                height:6,
+                background: i===0 ? "#6366F1" : "rgba(99,102,241,0.22)",
                 transition:"all 0.35s cubic-bezier(0.22,1,0.36,1)",
               }}/>
           ))}
@@ -855,7 +870,7 @@ export default function WhyTrustSection() {
             background:"radial-gradient(ellipse,rgba(99,102,241,0.22) 0%,transparent 70%)",
             filter:"blur(22px)" }}/>
           <div style={{ position:"relative",zIndex:1,width:"100%",height:"100%" }}>
-            <StableModelViewer scrollRef={dummyRef}/>
+            <StableModelViewer scrollRef={scrollProgressRef}/>
           </div>
           {PILLS.slice(0,3).map((pill,i)=>(
             <div key={pill.text} className="font-robert font-bold"

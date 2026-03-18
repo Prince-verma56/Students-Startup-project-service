@@ -241,8 +241,9 @@ export function SmoothCursor({
         translateX: "-50%",
         translateY: "-50%",
         rotate: rotation,
+        transformOrigin: "center",
         scale: scale,
-        zIndex: 100,
+        zIndex: 150,
         pointerEvents: "none",
         willChange: "transform",
         opacity: isVisible ? 1 : 0,
@@ -250,7 +251,7 @@ export function SmoothCursor({
       initial={false}
       animate={{ opacity: isVisible ? 1 : 0 }}
       transition={{
-        duration: 0.1,
+        duration: 0.01,
       }}
     >
       {cursor}
