@@ -60,7 +60,7 @@ function LoadingBox() {
 
 export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: React.MutableRefObject<number>, className?: string }) {
   return (
-    <div className={`w-full h-full relative ${className}`} style={{ minHeight: "400px", background: "#eef2ff" }}>
+    <div className={`w-full h-full relative ${className}`} style={{ minHeight: "400px" }}>
       {/* DEBUG TEXT: If you see this, the component is rendering */}
       <Canvas
         dpr={[1, 1.5]}
