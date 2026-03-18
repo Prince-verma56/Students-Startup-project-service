@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -8,10 +8,7 @@ import { useGSAP } from '@gsap/react'
 import SlideTextButton from '../kokonutui/slide-text-button'
 import { Link2Icon } from 'lucide-react'
 
-// Register GSAP
-if (typeof window !== 'undefined') {
-    gsap.registerPlugin(ScrollTrigger)
-}
+gsap.registerPlugin(ScrollTrigger)
 
 // Color Tokens
 const C = {
@@ -36,6 +33,12 @@ export default function HeroSection() {
     const paraRef = useRef<HTMLParagraphElement>(null)
     const btn1Ref = useRef<HTMLDivElement>(null)
     const btn2Ref = useRef<HTMLDivElement>(null)
+    const [isMounted, setIsMounted] = useState(false)
+
+    // Hydration fix: wait for component to mount before running DOM-heavy animations
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
 
     // ── 1. Video Scroll Mask Animation ─────────────────────────────────────
     useGSAP(() => {
@@ -74,6 +77,9 @@ export default function HeroSection() {
 
     // ── 2. Split-Text Word Entrance ────────────────────────────────────────
     useGSAP(() => {
+        // Wait for mount to avoid hydration errors
+        if (!isMounted) return
+
         const heading = headingRef.current
         if (!heading) return
 
@@ -108,8 +114,8 @@ export default function HeroSection() {
             "-=0.4"
         )
 
-        return () => { heading.innerHTML = originalHTML }
-    }, { scope: containerRef })
+        return () => { if (heading) heading.innerHTML = originalHTML }
+    }, { scope: containerRef, dependencies: [isMounted] })
 
     return (
         <section

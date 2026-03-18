@@ -307,9 +307,7 @@ export default function BasicDropdown({
           </motion.div>
         </button>
       </div>
-      {typeof window !== "undefined"
-        ? createPortal(dropdownContent, document.body)
-        : null}
+      {createPortal(dropdownContent, document.body)}
     </>
   );
 }

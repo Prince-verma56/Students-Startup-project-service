@@ -1,31 +1,37 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import gsap from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { useEffect, useRef } from "react"
+import Lenis from "lenis"
+import { usePathname } from "next/navigation"
 
 export default function SmoothScroll({ children }: { children: React.ReactNode }) {
+  const lenis = useRef<Lenis | null>(null)
+  const pathname = usePathname()
+
   useEffect(() => {
-    let locomotiveScroll: any;
+    if (lenis.current) lenis.current.scrollTo(0, { immediate: true })
+  }, [pathname])
 
-    const init = async () => {
-      const LocomotiveScroll = (await import("locomotive-scroll")).default;
-      locomotiveScroll = new LocomotiveScroll({
-        lenisOptions: {
-          duration: 1.2,
-          lerp: 0.1,
-          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-          smoothWheel: true,
-        },
-      })
+  useEffect(() => {
+    lenis.current = new Lenis({
+      duration: 1.2,
+      lerp: 0.1,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      touchMultiplier: 2,
+      infinite: false,
+    })
 
-      locomotiveScroll.on('scroll', ScrollTrigger.update)
+    const raf = (time: number) => {
+      lenis.current?.raf(time)
+      requestAnimationFrame(raf)
     }
 
-    init();
+    requestAnimationFrame(raf)
 
     return () => {
-      if (locomotiveScroll) locomotiveScroll.destroy()
+      lenis.current?.destroy()
+      lenis.current = null
     }
   }, [])
 
