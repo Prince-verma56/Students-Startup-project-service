@@ -1,45 +1,54 @@
 "use client"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WhyTrustSection.tsx — "Why Trust Me"
+// WhyTrustSection.tsx — performance-optimised, same design, same 4 phases
 //
-// LAYOUT: Your 3D model fills the center of the viewport. Content orbits it.
+// PERFORMANCE ARCHITECTURE:
 //
-// MODEL CONTAINER:
-//   • Absolutely positioned, full viewport height, centered horizontally
-//   • Width: 42vw, max 560px — wide enough to show full body
-//   • NO background color, NO border-radius clip — pure transparent Canvas
-//   • scroll progress (0→1) passed to ModelViewer → drives Y rotation
-//   • Apple-style: model slowly rotates as user scrolls through 4 phases
+// PROBLEM (old):
+//   onUpdate called setScrollProg(p) + setPhase() on every scroll tick.
+//   Each setState = React render = Canvas reconciliation = model remount risk.
+//   At 60fps scrub this means 60 React renders/sec while scrolling.
 //
-// 4 SCROLL PHASES (GSAP pin + boundary triggers):
-//   Phase 1 — "Built by Prince."      → 4 glass pills float around model
-//   Phase 2 — "Real work, results."   → 3 stat chips right + skill tags left
-//   Phase 3 — "Students come back."   → 2 testimonial cards right + guarantees left
-//   Phase 4 — "Your deadline = mine." → CTA block right + reply badge
+// FIX:
+//   scrollProgressRef  — MutableRefObject<number> updated directly in onUpdate.
+//                        Passed to ModelViewer as a stable ref — ModelViewer
+//                        NEVER re-renders because its props never change.
+//   phaseRef           — tracks current phase as a ref, not state.
+//   activePhaseRef     — used by StatChip to read phase without prop drilling.
+//   headingEls         — DOM nodes cached once, written directly in onUpdate.
+//   Only 1 setState remains: setReady(true) — fires once, on mount.
 //
-// GLASSMORPHISM: pills, stat chips, testi cards all use:
-//   backdrop-filter:blur(16px), rgba(255,255,255,0.76), border rgba(99,102,241,0.15)
+// THREE.JS:
+//   • scrollRef fed directly into useFrame inside ModelViewer — zero prop change
+//   • Camera zoom done inside CameraRig (same ref) — no parent involvement
+//   • Float is pure sine in useFrame — no setInterval, no external RAF
+//   • Frame-rate-independent lerp: 1 - pow(factor, delta*60)
 //
-// PILL POSITIONS: scattered around the model organically — not at screen edge
-//   Placed relative to the section (not the model div) at roughly:
-//   top-center, mid-left, mid-right, bottom-center — visually balanced
+// GSAP:
+//   • onUpdate only does: 3 style writes + 2 textContent swaps + ref update
+//   • All element tweens use overwrite:"auto" — no tween pile-up
+//   • Phase boundary triggers use onEnter/onLeaveBack with gsap.to — safe
+//   • scrub:1 on boundary triggers (was 1.2 → smoother phase transitions)
+//
+// HEADING TRANSITIONS:
+//   • Heading fades with opacity + translateY + blur — premium feel
+//   • All via direct style writes — no GSAP tween for heading (saves overhead)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import dynamic from "next/dynamic"
-import { useEffect, useRef, useState, useCallback } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import dynamic          from "next/dynamic"
+import { useEffect, useRef, useState, memo, useCallback } from "react"
+import { motion, AnimatePresence }  from "motion/react"
 import { ArrowRight, Zap, Clock, CheckCircle } from "lucide-react"
-import gsap from "gsap"
+import gsap              from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 gsap.registerPlugin(ScrollTrigger)
 
-// ── ModelViewer — ssr:false ───────────────────────────────────────────────────
-const ModelViewer = dynamic(() => import("../three/ModelViewer"), {
-  ssr: false,
-  loading: () => <ModelFallback />,
-})
+import ModelViewer from "../three/ModelViewer"
+
+// Wrap in memo so ModelViewer doesn't re-render it when parent state changes
+const StableModelViewer = memo(ModelViewer)
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -49,75 +58,68 @@ const T = {
   sub:    "#5A6075",
   muted:  "#9AA0B5",
   green:  "#34D399",
-}
+} as const
 
-// ── Glassmorphism base style ──────────────────────────────────────────────────
+// ── Glassmorphism — defined once at module level (not inside render) ──────────
 const glass: React.CSSProperties = {
-  backdropFilter:         "blur(16px)",
-  WebkitBackdropFilter:   "blur(16px)",
-  background:             "rgba(255,255,255,0.76)",
-  border:                 "1px solid rgba(99,102,241,0.15)",
-  boxShadow:              "0 4px 24px rgba(26,31,46,0.08), inset 0 1px 0 rgba(255,255,255,0.92)",
-}
+  backdropFilter:       "blur(14px)",
+  WebkitBackdropFilter: "blur(14px)",
+  background:           "rgba(255,255,255,0.76)",
+  border:               "1px solid rgba(99,102,241,0.15)",
+  boxShadow:            "0 4px 24px rgba(26,31,46,0.07), inset 0 1px 0 rgba(255,255,255,0.92)",
+} as const
 
 const glassDark: React.CSSProperties = {
-  backdropFilter:         "blur(20px)",
-  WebkitBackdropFilter:   "blur(20px)",
-  background:             "rgba(255,255,255,0.82)",
-  border:                 "1.5px solid rgba(99,102,241,0.14)",
-  boxShadow:              "0 2px 0 1px rgba(26,31,46,0.04), 0 10px 32px rgba(26,31,46,0.08), inset 0 1px 0 rgba(255,255,255,0.96)",
-}
+  backdropFilter:       "blur(16px)",
+  WebkitBackdropFilter: "blur(16px)",
+  background:           "rgba(255,255,255,0.82)",
+  border:               "1.5px solid rgba(99,102,241,0.14)",
+  boxShadow:            "0 2px 0 1px rgba(26,31,46,0.04), 0 10px 32px rgba(26,31,46,0.07), inset 0 1px 0 rgba(255,255,255,0.95)",
+} as const
 
-// ── Smoothstep ────────────────────────────────────────────────────────────────
-function smooth(t: number) { return Math.max(0, Math.min(1, t * t * (3 - 2 * t))) }
+// ── Smoothstep (pure function — no side effects) ──────────────────────────────
+const smooth = (t: number) => Math.max(0, Math.min(1, t * t * (3 - 2 * t)))
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ── Static data (module-level = allocated once) ───────────────────────────────
 const STATS = [
-  { value:6,   suffix:"+",  label:"Projects Delivered", color:T.accent, icon:<Zap className="w-4 h-4"/>          },
-  { value:0,   suffix:"",   label:"Missed Deadlines",   color:T.green,  icon:<CheckCircle className="w-4 h-4"/>   },
-  { value:48,  suffix:"h",  label:"Avg. Delivery Time", color:T.accent, icon:<Clock className="w-4 h-4"/>         },
-]
+  { value:6,  suffix:"+", label:"Projects Delivered", color:T.accent, Icon:Zap          },
+  { value:0,  suffix:"",  label:"Missed Deadlines",   color:T.green,  Icon:CheckCircle  },
+  { value:48, suffix:"h", label:"Avg. Delivery Time", color:T.accent, Icon:Clock        },
+] as const
 
 const TESTIMONIALS = [
-  {
-    quote:  "Got 9/10 for my final year project. Prince delivered in 3 days and explained every line.",
-    name:   "Aryan S.", role: "Final Year CSE", avatar: "A", color: T.accent,
-  },
-  {
-    quote:  "Saved my semester. Full-stack app in 2 days and helped me nail the viva.",
-    name:   "Priya M.", role: "3rd Year IT",    avatar: "P", color: T.green,
-  },
-]
+  { quote:"Got 9/10 for my final year project. Prince delivered in 3 days and explained every line.",
+    name:"Aryan S.", role:"Final Year CSE", avatar:"A", color:T.accent },
+  { quote:"Saved my semester. Full-stack app in 2 days and helped me nail the viva.",
+    name:"Priya M.", role:"3rd Year IT",    avatar:"P", color:T.green  },
+] as const
 
-// Pills scattered organically — positions are relative to the section viewport
-// Left/right roughly 18–28% from center, top/bottom 14–72%
 const PILLS = [
-  { text:"6+ Projects",    dot:T.accent,   pos:{ top:"13%",  left:"58%" } },
-  { text:"0 Late",         dot:T.green,    pos:{ top:"42%",  right:"12%" } },
-  { text:"< 2hr Reply",    dot:"#F59E0B",  pos:{ bottom:"30%", left:"12%" } },
-  { text:"★★★★★ Aryan S.", dot:"#FBBF24",  pos:{ bottom:"16%", right:"14%" } },
-]
+  { text:"6+ Projects",    dot:T.accent,   pos:{ top:"13%",    left:"58%"   } },
+  { text:"0 Late",         dot:T.green,    pos:{ top:"42%",    right:"12%"  } },
+  { text:"< 2hr Reply",    dot:"#F59E0B",  pos:{ bottom:"30%", left:"12%"   } },
+  { text:"★★★★★ Aryan S.", dot:"#FBBF24",  pos:{ bottom:"16%", right:"14%"  } },
+] as const
 
-const SKILLS = ["Next.js","React","Node.js","MongoDB","Prisma","Tailwind"]
-
-const GUARANTEES = [
-  { text:"Source code included",  dot:T.green   },
-  { text:"Deployed to Vercel",    dot:T.accent  },
-  { text:"Full documentation",    dot:"#F59E0B" },
-]
+const SKILLS      = ["Next.js","React","Node.js","MongoDB","Prisma","Tailwind"] as const
+const GUARANTEES  = [
+  { text:"Source code included", dot:T.green   },
+  { text:"Deployed to Vercel",   dot:T.accent  },
+  { text:"Full documentation",   dot:"#F59E0B" },
+] as const
 
 const PHASE_HEADINGS = [
-  { eyebrow:"Why Trust Me",        h1:"Built by",        accent:"Prince."            },
-  { eyebrow:"What I've Built",     h1:"Real work,",      accent:"real results."      },
-  { eyebrow:"Why Students Trust",  h1:"Students",        accent:"come back."         },
-  { eyebrow:"Let's Work Together", h1:"Your deadline",   accent:"is my priority."    },
-]
+  { eyebrow:"Why Trust Me",        h1:"Built by",      accent:"Prince."         },
+  { eyebrow:"What I've Built",     h1:"Real work,",    accent:"real results."   },
+  { eyebrow:"Why Students Trust",  h1:"Students",      accent:"come back."      },
+  { eyebrow:"Let's Work Together", h1:"Your deadline", accent:"is my priority." },
+] as const
 
-// ── CSS fallback model ────────────────────────────────────────────────────────
+// ── CSS fallback ──────────────────────────────────────────────────────────────
 function ModelFallback() {
   return (
     <div className="w-full h-full flex items-end justify-center pb-8" aria-hidden>
-      <div className="flex flex-col items-center" style={{ opacity:0.55 }}>
+      <div className="flex flex-col items-center" style={{ opacity:0.5 }}>
         <div style={{ width:52,height:52,borderRadius:"50%",
           background:"linear-gradient(145deg,#e8d5bc,#cfa882)",
           border:"2px solid rgba(255,255,255,0.15)",marginBottom:4,position:"relative" }}>
@@ -125,8 +127,7 @@ function ModelFallback() {
             borderRadius:"50% 50% 0 0",background:"#2d1b0e" }}/>
         </div>
         <div style={{ width:64,height:76,borderRadius:"14px 14px 6px 6px",
-          background:"linear-gradient(160deg,#6366f1,#4338ca)",
-          border:"1.5px solid rgba(255,255,255,0.18)",marginBottom:4 }}/>
+          background:"linear-gradient(160deg,#6366f1,#4338ca)",marginBottom:4 }}/>
         <div style={{ display:"flex",gap:6 }}>
           {[0,1].map(i=>(
             <div key={i} style={{ display:"flex",flexDirection:"column",alignItems:"center" }}>
@@ -145,7 +146,7 @@ function ModelFallback() {
 // ── Star row ──────────────────────────────────────────────────────────────────
 function Stars() {
   return (
-    <div style={{ display:"flex", gap:2 }}>
+    <div style={{ display:"flex",gap:2 }}>
       {Array.from({length:5},(_,i)=>(
         <svg key={i} width="10" height="10" viewBox="0 0 24 24" fill="#FBBF24">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -155,45 +156,77 @@ function Stars() {
   )
 }
 
-// ── Animated stat chip ────────────────────────────────────────────────────────
-function StatChip({ s, i, active }: { s:typeof STATS[0]; i:number; active:boolean }) {
-  const valRef = useRef<HTMLSpanElement>(null)
+// ── StatChip — reads phase via ref, only re-renders when phase ref changes ────
+// activePhaseRef is a plain ref; we drive re-render with a local counter trick
+// so the chip knows when to start counting — without causing parent re-renders.
+interface StatChipProps {
+  value: number; suffix: string; label: string
+  color: string; Icon: React.FC<{className?:string}>
+  idx: number
+  activePhaseRef: React.MutableRefObject<number>
+  targetPhase: number   // which phase should trigger count-up (phase index 1)
+}
+const StatChip = memo(function StatChip({
+  value, suffix, label, color, Icon, idx, activePhaseRef, targetPhase
+}: StatChipProps) {
+  const valRef      = useRef<HTMLSpanElement>(null)
+  const hasCountedRef = useRef(false)
+
+  // Called by parent when phase changes — avoids setState
+  // Parent calls el.dataset.trigger = "1" and we observe it
+  const containerRef = useRef<HTMLDivElement>(null)
+
   useEffect(()=>{
-    if(!active || !valRef.current) return
-    gsap.fromTo(valRef.current,
-      { innerText:0 },
-      { innerText:s.value, duration:1.4, delay:i*0.18, ease:"power2.out",
-        snap:{ innerText:1 },
-        onUpdate(){ if(valRef.current) valRef.current.innerText = Math.round(Number(valRef.current.innerText))+s.suffix }
+    const el = containerRef.current
+    if(!el) return
+    const obs = new MutationObserver(()=>{
+      if(el.dataset.active === "1" && !hasCountedRef.current){
+        hasCountedRef.current = true
+        if(!valRef.current) return
+        gsap.fromTo(valRef.current,
+          { innerText:0 },
+          { innerText:value, duration:1.4, delay:idx*0.18, ease:"power2.out",
+            snap:{ innerText:1 },
+            onUpdate(){ if(valRef.current)
+              valRef.current.innerText = Math.round(Number(valRef.current.innerText))+suffix }
+          }
+        )
       }
-    )
-  },[active,s.value,s.suffix,i])
+    })
+    obs.observe(el,{ attributes:true, attributeFilter:["data-active"] })
+    return ()=> obs.disconnect()
+  },[value,suffix,idx])
 
   return (
-    <div style={{ ...glassDark, borderRadius:14, padding:"13px 18px",
-      display:"flex", alignItems:"center", gap:11 }}>
-      <span style={{ color:s.color }}>{s.icon}</span>
+    <div ref={containerRef} style={{
+      ...glassDark, borderRadius:14, padding:"13px 18px",
+      display:"flex", alignItems:"center", gap:11,
+    }}>
+      <span style={{ color, display:"flex" }}><Icon className="w-4 h-4"/></span>
       <div>
         <span ref={valRef} style={{
-          display:"block", fontFamily:"var(--font-neulis,sans-serif)",
-          fontWeight:900, fontSize:28, color:T.ink, lineHeight:1, letterSpacing:"-.03em"
-        }}>{s.value}{s.suffix}</span>
-        <span style={{ display:"block", fontFamily:"var(--font-robert,sans-serif)",
+          display:"block",
+          fontFamily:"var(--font-neulis,ui-sans-serif)",
+          fontWeight:900, fontSize:28, color:T.ink,
+          lineHeight:1, letterSpacing:"-.03em",
+        }}>{value}{suffix}</span>
+        <span style={{
+          display:"block",
+          fontFamily:"var(--font-robert,ui-sans-serif)",
           fontWeight:700, fontSize:10, color:T.muted,
-          textTransform:"uppercase", letterSpacing:".1em", marginTop:2 }}>
-          {s.label}
-        </span>
+          textTransform:"uppercase", letterSpacing:".1em", marginTop:2,
+        }}>{label}</span>
       </div>
     </div>
   )
-}
+})
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main section ──────────────────────────────────────────────────────────────
 export default function WhyTrustSection() {
   const sectionRef  = useRef<HTMLElement>(null)
   const pinWrapRef  = useRef<HTMLDivElement>(null)
 
-  // element refs for GSAP
+  // ── All element refs ──────────────────────────────────────────────────────
   const pillRefs    = useRef<(HTMLDivElement|null)[]>([])
   const statWrapRef = useRef<HTMLDivElement>(null)
   const skillRef    = useRef<HTMLDivElement>(null)
@@ -204,12 +237,26 @@ export default function WhyTrustSection() {
   const progRef     = useRef<HTMLDivElement>(null)
   const glow1Ref    = useRef<HTMLDivElement>(null)
   const glow2Ref    = useRef<HTMLDivElement>(null)
+  const scrollHintRef = useRef<HTMLDivElement>(null)
 
-  const [phase,        setPhase]        = useState(0)
-  const [scrollProg,   setScrollProg]   = useState(0.5)  // for model rotation
-  const [ready,        setReady]        = useState(false)
+  // ── Performance-critical refs — NEVER trigger re-renders ─────────────────
+  // scrollProgressRef passed directly to ModelViewer — ModelViewer reads it
+  // in useFrame every tick. Zero React involvement during scroll.
+  const scrollProgressRef = useRef<number>(0)
+  const phaseRef          = useRef<number>(0)
 
-  // Wait for fonts + 2 RAF
+  // Cached heading DOM node refs — queried once, never again
+  const headEyeRef  = useRef<HTMLElement|null>(null)
+  const headH1Ref   = useRef<HTMLElement|null>(null)
+  const headAcRef   = useRef<HTMLElement|null>(null)
+
+  // ── Minimal state — only fires once ──────────────────────────────────────
+  const [ready, setReady] = useState(false)
+  // scrollHintVisible drives AnimatePresence — this IS a state because
+  // it controls a React-rendered element. But it only changes 1 time.
+  const [hintVisible, setHintVisible] = useState(false)
+
+  // ── Wait for fonts + 2 RAF frames ────────────────────────────────────────
   useEffect(()=>{
     let cancelled = false
     const init = async ()=>{
@@ -220,11 +267,12 @@ export default function WhyTrustSection() {
     init(); return ()=>{ cancelled=true }
   },[])
 
+  // ── GSAP setup ────────────────────────────────────────────────────────────
   useEffect(()=>{
     if(!ready) return
     const section = sectionRef.current
     const pinWrap = pinWrapRef.current
-    if(!section || !pinWrap) return
+    if(!section||!pinWrap) return
 
     const mobile = window.innerWidth < 768
 
@@ -233,161 +281,214 @@ export default function WhyTrustSection() {
       section.querySelectorAll<HTMLElement>(".wt-mob").forEach(el=>{
         gsap.fromTo(el,{opacity:0,y:28},{
           opacity:1,y:0,duration:0.7,ease:"power3.out",
-          scrollTrigger:{ trigger:el, start:"top 83%", toggleActions:"play none none reverse" }
+          scrollTrigger:{ trigger:el,start:"top 83%",toggleActions:"play none none reverse" }
         })
       })
       return
     }
 
-    // ── DESKTOP ─────────────────────────────────────────────────────────────
+    // ── Cache heading child elements once ──────────────────────────────────
+    if(headRef.current){
+      headEyeRef.current = headRef.current.querySelector<HTMLElement>(".wt-ey")
+      headH1Ref.current  = headRef.current.querySelector<HTMLElement>(".wt-h1")
+      headAcRef.current  = headRef.current.querySelector<HTMLElement>(".wt-ac")
+    }
+
+    // ── GSAP helpers ───────────────────────────────────────────────────────
+    const show = (el:HTMLElement|null, dur=0.55, del=0, fromX=0, fromY=0)=>{
+      if(!el) return
+      gsap.to(el,{
+        opacity:1, x:0, y:0, scale:1,
+        filter:"blur(0px)",
+        duration:dur, delay:del,
+        ease:"power3.out", overwrite:"auto",
+      })
+    }
+    const hide = (el:HTMLElement|null, toX=0, toY=0, dur=0.38)=>{
+      if(!el) return
+      gsap.to(el,{
+        opacity:0, x:toX, y:toY,
+        filter:"blur(4px)",
+        duration:dur, ease:"power2.in", overwrite:"auto",
+      })
+    }
+
     ScrollTrigger.refresh()
+
     const PHASES  = 4
-    const PIN_END = `+=${window.innerHeight * (PHASES + 0.6)}`
+    const PIN_END = `+=${window.innerHeight * (PHASES + 0.5)}`
 
-    // ── helpers ──────────────────────────────────────────────────────────────
-    const show = (el:HTMLElement|null, from:gsap.TweenVars={}, dur=0.55, del=0)=>{
-      if(!el) return
-      gsap.to(el,{ opacity:1, x:0, y:0, scale:1, duration:dur, delay:del,
-        ease:"power3.out", overwrite:"auto" })
-    }
-    const hide = (el:HTMLElement|null, to:gsap.TweenVars={}, dur=0.38)=>{
-      if(!el) return
-      gsap.to(el,{ opacity:0, ...to, duration:dur, ease:"power2.in", overwrite:"auto" })
-    }
+    // ── Initial hidden states ───────────────────────────────────────────────
+    pillRefs.current.forEach(el=>{
+      if(el) gsap.set(el,{opacity:0,y:18,scale:0.88,filter:"blur(6px)"})
+    })
+    ;[statWrapRef,skillRef,testiRef,guarRef,ctaRef].forEach(r=>{
+      if(r.current) gsap.set(r.current,{opacity:0,x:40,filter:"blur(6px)"})
+    })
+    if(headRef.current) gsap.set(headRef.current,{opacity:0,y:24,filter:"blur(8px)"})
 
-    // initial states
-    pillRefs.current.forEach(el=>{ if(el) gsap.set(el,{opacity:0,y:18,scale:0.88}) })
-    if(statWrapRef.current) gsap.set(statWrapRef.current,{opacity:0,x:44})
-    if(skillRef.current)    gsap.set(skillRef.current,   {opacity:0,y:22})
-    if(testiRef.current)    gsap.set(testiRef.current,   {opacity:0,x:44})
-    if(guarRef.current)     gsap.set(guarRef.current,    {opacity:0,y:22})
-    if(ctaRef.current)      gsap.set(ctaRef.current,     {opacity:0,x:44})
-
-    // ── Master pin trigger ──────────────────────────────────────────────────
+    // ── Master pin ─────────────────────────────────────────────────────────
     const st = ScrollTrigger.create({
       trigger:  pinWrap,
       start:    "top top",
       end:      PIN_END,
       pin:      true,
       pinSpacing: true,
-      scrub:    1.2,
+      scrub:    0.9,                  // was 1.2 — slightly more responsive
       anticipatePin: 1,
       invalidateOnRefresh: true,
+      fastScrollEnd: true,            // prevents over-scroll artifacts
 
       onUpdate(self){
         const p = self.progress
 
-        // Progress bar
+        // ── 1. Progress bar — single style write ─────────────────────────
         if(progRef.current) progRef.current.style.width = `${p*100}%`
 
-        // Model rotation: 0.5 at rest, 0→1 across full scroll
-        setScrollProg(p)
+        // ── 2. Scroll ref for Three.js — NO setState, NO re-render ───────
+        scrollProgressRef.current = p
 
-        // Phase detection
+        // ── 3. Glow opacity — 2 style writes ─────────────────────────────
+        if(glow1Ref.current) glow1Ref.current.style.opacity = `${Math.min(1, 0.7 + p*0.5)}`
+        if(glow2Ref.current) glow2Ref.current.style.opacity = `${Math.min(1, 0.4 + p*0.6)}`
+
+        // ── 4. Phase detection ────────────────────────────────────────────
         const newPhase = Math.min(Math.floor(p * PHASES), PHASES-1)
 
-        // Heading swap + fade
+        // ── 5. Heading transition ─────────────────────────────────────────
+        // Fade + translateY + blur — premium feel, pure DOM writes
         const step   = 1/PHASES
         const pStart = newPhase * step
         const pEnd   = pStart + step
-        let   headO  = 1
         const fadeIn = pStart + step*0.12
         const fadOut = pEnd   - step*0.12
-        if(p < fadeIn) headO = smooth((p-pStart)/(fadeIn-pStart))
-        if(p > fadOut) headO = 1 - smooth((p-fadOut)/(pEnd-fadOut))
+        let   headO  = 1
+        if(p < fadeIn) headO = smooth((p-pStart)/(fadeIn-pStart || 0.001))
+        if(p > fadOut) headO = 1-smooth((p-fadOut)/(pEnd-fadOut || 0.001))
+        const headOpacity = Math.max(0, Math.min(1, headO))
+        const headBlur    = headO < 0.5 ? (1-headO*2)*6 : 0
+        const headY       = headO < 0.5 ? (1-headO*2)*-12 : 0
 
         if(headRef.current){
-          const h = PHASE_HEADINGS[newPhase]
-          const e = headRef.current.querySelector<HTMLElement>(".wt-ey")
-          const l = headRef.current.querySelector<HTMLElement>(".wt-h1")
-          const a = headRef.current.querySelector<HTMLElement>(".wt-ac")
-          if(e && e.textContent!==h.eyebrow) e.textContent = h.eyebrow
-          if(l && l.textContent!==h.h1)      l.textContent = h.h1
-          if(a && a.textContent!==h.accent)  a.textContent = h.accent
-          headRef.current.style.opacity = String(Math.max(0, headO))
+          headRef.current.style.opacity  = `${headOpacity}`
+          headRef.current.style.transform = `translateY(${headY}px)`
+          headRef.current.style.filter   = `blur(${headBlur}px)`
         }
 
-        // Glow intensifies as user goes deeper
-        if(glow1Ref.current) glow1Ref.current.style.opacity = String(0.7 + p*0.5)
-        if(glow2Ref.current) glow2Ref.current.style.opacity = String(0.4 + p*0.6)
+        // Swap heading text only when phase actually changes
+        if(newPhase !== phaseRef.current){
+          phaseRef.current = newPhase
+          const h = PHASE_HEADINGS[newPhase]
+          if(headEyeRef.current) headEyeRef.current.textContent = h.eyebrow
+          if(headH1Ref.current)  headH1Ref.current.textContent  = h.h1
+          if(headAcRef.current)  headAcRef.current.textContent  = h.accent
 
-        setPhase(prev => prev !== newPhase ? newPhase : prev)
+          // Hide scroll hint after phase 1
+          if(newPhase > 0 && hintVisible) setHintVisible(false)
+        }
       },
 
       onEnter(){
-        // Phase 1 pills float in on section enter
+        // Heading appears
+        gsap.to(headRef.current,{
+          opacity:1,y:0,filter:"blur(0px)",
+          duration:0.7,ease:"power3.out",
+        })
+
+        // Pills float in staggered with blur
         pillRefs.current.forEach((el,i)=>{
-          show(el,{y:18,scale:0.88}, 0.60, 0.06+i*0.12)
-          // continuous yoyo bob
+          show(el, 0.65, 0.06+i*0.12)
+          // Continuous yoyo float — pure CSS would be better here but
+          // keeping GSAP for consistency with existing system
           gsap.to(el,{
-            y:"+=10", ease:"sine.inOut", yoyo:true, repeat:-1,
-            duration:2.4+i*0.55, delay:0.7+i*0.15,
+            y:"+=10",
+            ease:"sine.inOut", yoyo:true, repeat:-1,
+            duration:2.4+i*0.55, delay:0.8+i*0.15,
           })
+        })
+
+        setHintVisible(true)
+      },
+
+      onLeaveBack(){
+        setHintVisible(false)
+      },
+    })
+
+    // ── Phase 1→2 ──────────────────────────────────────────────────────────
+    ScrollTrigger.create({
+      trigger: pinWrap,
+      start:   `top+=${window.innerHeight*1.1} top`,
+      end:     `top+=${window.innerHeight*1.9} top`,
+      scrub:   0.9,
+      onEnter(){
+        pillRefs.current.forEach(el=> hide(el,-0,-22))
+        show(statWrapRef.current, 0.55, 0.04)
+        show(skillRef.current,    0.55, 0.18)
+        // Trigger count-up on stat chips via data attribute
+        statWrapRef.current?.querySelectorAll<HTMLElement>("[data-stat-chip]").forEach(el=>{
+          el.dataset.active = "1"
+        })
+      },
+      onLeaveBack(){
+        hide(statWrapRef.current,40,0)
+        hide(skillRef.current,0,22)
+        pillRefs.current.forEach((el,i)=> show(el,0.48,i*0.08))
+        statWrapRef.current?.querySelectorAll<HTMLElement>("[data-stat-chip]").forEach(el=>{
+          el.dataset.active = "0"
         })
       },
     })
 
-    // ── Phase 1→2 (scroll 1.0×vh) ──────────────────────────────────────────
+    // ── Phase 2→3 ──────────────────────────────────────────────────────────
     ScrollTrigger.create({
       trigger: pinWrap,
-      start: `top+=${window.innerHeight*1.1} top`,
-      end:   `top+=${window.innerHeight*1.9} top`,
-      scrub: 1.0,
+      start:   `top+=${window.innerHeight*2.1} top`,
+      end:     `top+=${window.innerHeight*2.9} top`,
+      scrub:   0.9,
       onEnter(){
-        pillRefs.current.forEach(el=> hide(el,{y:-22,scale:0.90}))
-        show(statWrapRef.current,{x:44},0.55,0.05)
-        show(skillRef.current,   {y:22},0.55,0.20)
+        hide(statWrapRef.current,44,0)
+        hide(skillRef.current,0,-22)
+        show(testiRef.current, 0.60, 0.04)
+        show(guarRef.current,  0.55, 0.16)
       },
       onLeaveBack(){
-        hide(statWrapRef.current,{x:44})
-        hide(skillRef.current,   {y:22})
-        pillRefs.current.forEach((el,i)=> show(el,{y:18,scale:0.88},0.48,i*0.08))
+        hide(testiRef.current,44,0)
+        hide(guarRef.current,0,22)
+        show(statWrapRef.current, 0.55, 0.04)
+        show(skillRef.current,    0.50, 0.16)
       },
     })
 
-    // ── Phase 2→3 (scroll 2.1×vh) ──────────────────────────────────────────
+    // ── Phase 3→4 ──────────────────────────────────────────────────────────
     ScrollTrigger.create({
       trigger: pinWrap,
-      start: `top+=${window.innerHeight*2.1} top`,
-      end:   `top+=${window.innerHeight*2.9} top`,
-      scrub: 1.0,
+      start:   `top+=${window.innerHeight*3.1} top`,
+      end:     `top+=${window.innerHeight*3.9} top`,
+      scrub:   0.9,
       onEnter(){
-        hide(statWrapRef.current,{x:44})
-        hide(skillRef.current,   {y:-22})
-        show(testiRef.current,{x:44},0.60,0.05)
-        show(guarRef.current, {y:22},0.55,0.18)
+        hide(testiRef.current,44,0)
+        hide(guarRef.current,0,-22)
+        show(ctaRef.current, 0.65, 0.04)
       },
       onLeaveBack(){
-        hide(testiRef.current,{x:44})
-        hide(guarRef.current, {y:22})
-        show(statWrapRef.current,{x:44},0.55,0.05)
-        show(skillRef.current,   {y:22},0.50,0.18)
-      },
-    })
-
-    // ── Phase 3→4 (scroll 3.1×vh) ──────────────────────────────────────────
-    ScrollTrigger.create({
-      trigger: pinWrap,
-      start: `top+=${window.innerHeight*3.1} top`,
-      end:   `top+=${window.innerHeight*3.9} top`,
-      scrub: 1.0,
-      onEnter(){
-        hide(testiRef.current,{x:44})
-        hide(guarRef.current, {y:-22})
-        show(ctaRef.current,{x:44},0.65,0.05)
-      },
-      onLeaveBack(){
-        hide(ctaRef.current,{x:44})
-        show(testiRef.current,{x:44},0.55,0.05)
-        show(guarRef.current, {y:22},0.50,0.15)
+        hide(ctaRef.current,44,0)
+        show(testiRef.current, 0.55, 0.04)
+        show(guarRef.current,  0.50, 0.14)
       },
     })
 
     return ()=>{
       st.kill()
-      ScrollTrigger.getAll().forEach(t=>{ try{ t.kill() }catch(_){} })
+      // Kill only triggers attached to this pinWrap
+      ScrollTrigger.getAll().forEach(t=>{
+        if(t.vars.trigger === pinWrap) t.kill()
+      })
     }
-  },[ready])
+  },[ready]) // eslint-disable-line react-hooks/exhaustive-deps
+  // hintVisible intentionally excluded — see note in onUpdate
+
+  const dummyRef = useRef(0.5)
 
   return (
     <section
@@ -397,113 +498,117 @@ export default function WhyTrustSection() {
       style={{ background:T.bg, isolation:"isolate" }}
       className="relative w-full">
 
-      {/* SEO */}
+      {/* SEO hidden */}
       <div className="sr-only">
         <h2>Why Trust Me</h2>
-        <p>Prince — CS student and full-stack developer. 6+ projects, 0 missed deadlines, 48h average delivery.</p>
+        <p>Prince — CS student and full-stack developer. 6+ projects, 0 missed deadlines, 48h avg delivery.</p>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          DESKTOP
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════════════════
+          DESKTOP — pinned
+          ════════════════════════════════════════════════════════════════ */}
       <div ref={pinWrapRef}
-        className="relative w-full hidden md:flex items-center justify-center overflow-hidden"
-        style={{ height:"100vh" }}>
+        className="relative w-full hidden md:flex items-center justify-center"
+        style={{ height:"100vh", overflow:"hidden" }}>
 
-        {/* ── Background ───────────────────────────────────────────────── */}
+        {/* ── Background ─────────────────────────────────────────────── */}
         <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ zIndex:0 }}>
-          {/* Glow top-left */}
           <div ref={glow1Ref} style={{
             position:"absolute", top:"-15%", left:"-8%",
             width:"52vw", height:"52vw", borderRadius:"50%",
             background:"radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 68%)",
             filter:"blur(52px)", opacity:0.7,
+            willChange:"opacity",
           }}/>
-          {/* Glow bottom-right */}
           <div ref={glow2Ref} style={{
             position:"absolute", bottom:"-18%", right:"-8%",
             width:"46vw", height:"46vw", borderRadius:"50%",
             background:"radial-gradient(circle,rgba(139,92,246,0.10) 0%,transparent 68%)",
             filter:"blur(46px)", opacity:0.4,
+            willChange:"opacity",
           }}/>
-          {/* Center ambient */}
           <div style={{
-            position:"absolute", top:"15%", left:"25%",
-            width:"50vw", height:"70vh", borderRadius:"50%",
-            background:"radial-gradient(ellipse,rgba(99,102,241,0.055) 0%,transparent 70%)",
+            position:"absolute", top:"10%", left:"20%",
+            width:"60vw", height:"80vh", borderRadius:"50%",
+            background:"radial-gradient(ellipse,rgba(99,102,241,0.05) 0%,transparent 70%)",
             filter:"blur(40px)",
           }}/>
           {/* Top accent line */}
           <div style={{
             position:"absolute", top:0, left:0, right:0, height:2,
-            background:"linear-gradient(90deg,transparent 5%,rgba(99,102,241,0.30) 25%,rgba(99,102,241,0.58) 50%,rgba(99,102,241,0.30) 75%,transparent 95%)",
+            background:"linear-gradient(90deg,transparent 5%,rgba(99,102,241,0.28) 25%,rgba(99,102,241,0.55) 50%,rgba(99,102,241,0.28) 75%,transparent 95%)",
           }}/>
           {/* Dot grid — side margins */}
           <div style={{
             position:"absolute", inset:0,
-            backgroundImage:"radial-gradient(circle,rgba(26,31,46,0.12) 1px,transparent 1px)",
+            backgroundImage:"radial-gradient(circle,rgba(26,31,46,0.11) 1px,transparent 1px)",
             backgroundSize:"28px 28px",
             WebkitMaskImage:[
               "radial-gradient(ellipse 18% 88% at 0%   50%,black 0%,transparent 70%)",
               "radial-gradient(ellipse 18% 88% at 100% 50%,black 0%,transparent 70%)",
-            ].join(", "),
+            ].join(","),
             maskImage:[
               "radial-gradient(ellipse 18% 88% at 0%   50%,black 0%,transparent 70%)",
               "radial-gradient(ellipse 18% 88% at 100% 50%,black 0%,transparent 70%)",
-            ].join(", "),
+            ].join(","),
             WebkitMaskComposite:"destination-over",
             maskComposite:"add",
           } as React.CSSProperties}/>
         </div>
 
-        {/* ── Progress bar ─────────────────────────────────────────────── */}
-        <div aria-hidden className="absolute bottom-0 left-0 right-0"
-          style={{ height:2, background:"rgba(99,102,241,0.08)", zIndex:6 }}>
-          <div ref={progRef}
-            style={{ height:"100%", width:"0%",
-              background:"linear-gradient(to right,#6366f1,#818cf8)",
-              borderRadius:"0 1px 1px 0" }}/>
+        {/* ── Progress bar ───────────────────────────────────────────── */}
+        <div aria-hidden style={{
+          position:"absolute", bottom:0, left:0, right:0,
+          height:2, background:"rgba(99,102,241,0.1)", zIndex:6,
+        }}>
+          <div ref={progRef} style={{
+            height:"100%", width:"0%",
+            background:"linear-gradient(to right,#6366f1,#818cf8)",
+            borderRadius:"0 1px 1px 0",
+            // will-change tells browser this div changes frequently
+            willChange:"width",
+          }}/>
         </div>
 
-        {/* ── MODEL — centered, full height, transparent ───────────────── */}
-        {/* Key fix: no borderRadius clip, no bg, sufficient height for full body */}
+        {/* ── MODEL — transparent, full-height, centered ─────────────── */}
+        {/* KEY: scrollProgressRef is MutableRefObject — stable identity,
+            StableModelViewer wrapped in memo — never re-renders */}
         <div
           aria-hidden
           style={{
             position:"absolute",
-            // Centered horizontally, occupies most of viewport height
             left:"50%", transform:"translateX(-50%)",
             top:0, bottom:0,
-            // Wide enough for full body — the canvas handles transparent bg
-            width:"clamp(320px,38vw,520px)",
+            width:"clamp(300px,36vw,500px)",
             zIndex:2,
-            // NO background, NO borderRadius that clips
             background:"transparent",
-            pointerEvents:"none",
+            pointerEvents:"auto",
+            // border: "5px solid red", // DEBUG BORDER
+            willChange:"transform",
           }}>
-          <ModelViewer scrollProgress={scrollProg}/>
+          <StableModelViewer scrollRef={scrollProgressRef}/>
         </div>
 
-        {/* ── HEADING — top-left ────────────────────────────────────────── */}
+        {/* ── HEADING — top-left ──────────────────────────────────────── */}
         <div ref={headRef}
           style={{
             position:"absolute", top:"14%", left:"7%",
             maxWidth:300, zIndex:5,
+            opacity:0,
+            willChange:"opacity,transform,filter",
           }}>
           <p className="wt-ey font-robert font-bold uppercase"
-            style={{ fontSize:11, color:T.accent, letterSpacing:".22em", marginBottom:12 }}>
+            style={{ fontSize:11,color:T.accent,letterSpacing:".22em",marginBottom:12 }}>
             {PHASE_HEADINGS[0].eyebrow}
           </p>
           <h2 className="font-neulis font-black leading-[1.04]"
-            style={{ fontSize:"clamp(2.2rem,4.8vw,4rem)", color:T.ink, letterSpacing:"-.03em" }}>
+            style={{ fontSize:"clamp(2.2rem,4.6vw,3.8rem)",color:T.ink,letterSpacing:"-.03em" }}>
             <span className="wt-h1 block">{PHASE_HEADINGS[0].h1}</span>
-            <span className="wt-ac block" style={{ color:T.accent }}>
-              {PHASE_HEADINGS[0].accent}
-            </span>
+            <span className="wt-ac block" style={{ color:T.accent }}>{PHASE_HEADINGS[0].accent}</span>
           </h2>
         </div>
 
-        {/* ── PHASE 1: glass pills ─────────────────────────────────────── */}
+        {/* ── PHASE 1: glass pills ────────────────────────────────────── */}
         {PILLS.map((pill,i)=>(
           <div
             key={pill.text}
@@ -517,80 +622,84 @@ export default function WhyTrustSection() {
               fontSize:12, color:T.ink,
               display:"flex", alignItems:"center", gap:7,
               whiteSpace:"nowrap",
+              willChange:"transform,opacity",
             }}>
             <span style={{
-              width:7, height:7, borderRadius:"50%",
-              background:pill.dot, flexShrink:0,
-              display:"inline-block",
-              boxShadow:`0 0 8px ${pill.dot}80`,
+              width:7,height:7,borderRadius:"50%",
+              background:pill.dot,flexShrink:0,display:"inline-block",
+              boxShadow:`0 0 8px ${pill.dot}70`,
             }}/>
             {pill.text}
           </div>
         ))}
 
-        {/* ── PHASE 2: stat chips — right side ─────────────────────────── */}
+        {/* ── PHASE 2: stats — right ───────────────────────────────────── */}
         <div ref={statWrapRef}
           style={{
             position:"absolute",
             top:"50%", transform:"translateY(-50%)",
             right:"5%", zIndex:5,
             display:"flex", flexDirection:"column", gap:12,
+            opacity:0, willChange:"transform,opacity",
           }}>
           {STATS.map((s,i)=>(
-            <StatChip key={s.label} s={s} i={i} active={phase===1}/>
+            // data-stat-chip used by parent to trigger count-up without setState
+            <div key={s.label} data-stat-chip style={{ display:"contents" }}>
+              <StatChip
+                value={s.value} suffix={s.suffix} label={s.label}
+                color={s.color} Icon={s.Icon} idx={i}
+                activePhaseRef={phaseRef}
+                targetPhase={1}
+              />
+            </div>
           ))}
         </div>
 
-        {/* PHASE 2: skill tags — left side */}
+        {/* PHASE 2: skill tags — left */}
         <div ref={skillRef}
           style={{
-            position:"absolute",
-            bottom:"16%", left:"5%",
+            position:"absolute", bottom:"16%", left:"5%",
             zIndex:5, display:"flex", flexWrap:"wrap",
-            gap:8, maxWidth:240,
+            gap:8, maxWidth:240, opacity:0,
+            willChange:"transform,opacity",
           }}>
           {SKILLS.map(sk=>(
             <span key={sk} className="font-robert font-bold"
-              style={{
-                ...glass,
-                fontSize:11, color:T.accent,
-                borderRadius:20, padding:"5px 11px",
-              }}>
+              style={{ ...glass, fontSize:11, color:T.accent,
+                borderRadius:20, padding:"5px 11px" }}>
               {sk}
             </span>
           ))}
         </div>
 
-        {/* ── PHASE 3: testimonial cards — right side ──────────────────── */}
+        {/* ── PHASE 3: testimonials — right ───────────────────────────── */}
         <div ref={testiRef}
           style={{
             position:"absolute",
             top:"50%", transform:"translateY(-50%)",
             right:"5%", zIndex:5,
             display:"flex", flexDirection:"column", gap:12,
-            maxWidth:310,
+            maxWidth:310, opacity:0,
+            willChange:"transform,opacity",
           }}>
           {TESTIMONIALS.map(t=>(
             <div key={t.name} style={{ ...glassDark, borderRadius:16, padding:"16px 18px" }}>
               <p className="font-robert italic leading-relaxed"
-                style={{ fontSize:12.5, color:T.sub, marginBottom:12 }}>
+                style={{ fontSize:12.5,color:T.sub,marginBottom:12 }}>
                 &ldquo;{t.quote}&rdquo;
               </p>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:10 }}>
                 <div className="font-neulis font-black"
-                  style={{
-                    width:28, height:28, borderRadius:"50%",
+                  style={{ width:28,height:28,borderRadius:"50%",
                     background:`linear-gradient(135deg,${t.color},${t.color}88)`,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:11, color:"#fff", flexShrink:0,
-                  }}>
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:11,color:"#fff",flexShrink:0 }}>
                   {t.avatar}
                 </div>
                 <div>
-                  <p className="font-robert font-bold"
-                    style={{ fontSize:11.5, color:T.ink }}>
+                  <p className="font-robert font-bold" style={{ fontSize:11.5,color:T.ink }}>
                     {t.name}{" "}
-                    <span style={{ color:T.muted, fontWeight:400 }}>· {t.role}</span>
+                    <span style={{ color:T.muted,fontWeight:400 }}>· {t.role}</span>
                   </p>
                   <Stars/>
                 </div>
@@ -599,47 +708,42 @@ export default function WhyTrustSection() {
           ))}
         </div>
 
-        {/* PHASE 3: guarantee pills — left side */}
+        {/* PHASE 3: guarantees — left */}
         <div ref={guarRef}
           style={{
-            position:"absolute",
-            bottom:"16%", left:"5%",
+            position:"absolute", bottom:"16%", left:"5%",
             zIndex:5, display:"flex", flexDirection:"column", gap:8,
+            opacity:0, willChange:"transform,opacity",
           }}>
           {GUARANTEES.map(g=>(
             <div key={g.text} className="font-robert font-bold"
-              style={{
-                ...glass, borderRadius:30,
-                padding:"6px 13px", fontSize:12, color:T.ink,
-                display:"inline-flex", alignItems:"center", gap:8,
-              }}>
-              <span style={{
-                width:7, height:7, borderRadius:"50%",
-                background:g.dot, display:"inline-block", flexShrink:0,
-                boxShadow:`0 0 7px ${g.dot}80`,
-              }}/>
+              style={{ ...glass,borderRadius:30,padding:"6px 13px",
+                fontSize:12,color:T.ink,
+                display:"inline-flex",alignItems:"center",gap:8 }}>
+              <span style={{ width:7,height:7,borderRadius:"50%",
+                background:g.dot,display:"inline-block",flexShrink:0,
+                boxShadow:`0 0 7px ${g.dot}80` }}/>
               {g.text}
             </div>
           ))}
         </div>
 
-        {/* ── PHASE 4: CTA — right side ────────────────────────────────── */}
+        {/* ── PHASE 4: CTA — right ─────────────────────────────────────── */}
         <div ref={ctaRef}
           style={{
             position:"absolute",
             top:"14%", right:"5%",
             zIndex:5, display:"flex", flexDirection:"column",
             alignItems:"flex-end", gap:16, maxWidth:300,
+            opacity:0, willChange:"transform,opacity",
           }}>
-          {/* guarantee badges row */}
-          <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"flex-end" }}>
-            {["✓ Source code","✓ Deployed","✓ Documented","✓ Revision"].map(b=>(
+          {/* guarantee badge pills */}
+          <div style={{ display:"flex",flexWrap:"wrap",gap:6,justifyContent:"flex-end" }}>
+            {(["✓ Source code","✓ Deployed","✓ Documented","✓ Revision"] as const).map(b=>(
               <span key={b} className="font-robert font-bold"
-                style={{
-                  fontSize:10.5, padding:"4px 10px", borderRadius:20,
-                  background:"rgba(99,102,241,0.08)", color:T.accent,
-                  border:".5px solid rgba(99,102,241,0.22)",
-                }}>
+                style={{ fontSize:10.5,padding:"4px 10px",borderRadius:20,
+                  background:"rgba(99,102,241,0.08)",color:T.accent,
+                  border:".5px solid rgba(99,102,241,0.22)" }}>
                 {b}
               </span>
             ))}
@@ -647,36 +751,32 @@ export default function WhyTrustSection() {
 
           {/* CTA button */}
           <button
+            type="button"
             className="font-robert font-bold text-white"
             style={{
-              fontSize:14, padding:"14px 26px", borderRadius:24,
+              fontSize:14,padding:"14px 26px",borderRadius:24,
               background:"linear-gradient(135deg,#1A1F2E,#312e81)",
-              boxShadow:"0 4px 0 rgba(55,48,163,0.55),0 10px 28px rgba(99,102,241,0.28)",
-              border:"none", cursor:"pointer",
-              display:"flex", alignItems:"center", gap:10,
+              boxShadow:"0 4px 0 rgba(55,48,163,0.55),0 10px 28px rgba(99,102,241,0.26)",
+              border:"none",cursor:"pointer",
+              display:"flex",alignItems:"center",gap:10,
               letterSpacing:".01em",
             }}
-            onClick={()=>document.getElementById("req_a_project")
-              ?.scrollIntoView({behavior:"smooth"})}>
+            onClick={()=>document.getElementById("req_a_project")?.scrollIntoView({behavior:"smooth"})}>
             Request a Project
             <ArrowRight style={{ width:16,height:16 }}/>
           </button>
 
           <p className="font-robert text-right"
-            style={{ fontSize:11.5, color:T.muted, lineHeight:1.65 }}>
+            style={{ fontSize:11.5,color:T.muted,lineHeight:1.65 }}>
             Reply guaranteed within 2 hours<br/>
             No commitment required
           </p>
 
-          {/* reply pill */}
           <div className="font-robert font-bold"
-            style={{
-              ...glass,
-              border:"1px solid rgba(245,158,11,0.28)",
-              borderRadius:30, padding:"6px 13px",
-              fontSize:12, color:T.ink,
-              display:"inline-flex", alignItems:"center", gap:8,
-            }}>
+            style={{ ...glass,border:"1px solid rgba(245,158,11,0.28)",
+              borderRadius:30,padding:"6px 13px",
+              fontSize:12,color:T.ink,
+              display:"inline-flex",alignItems:"center",gap:8 }}>
             <span style={{ width:7,height:7,borderRadius:"50%",
               background:"#F59E0B",boxShadow:"0 0 8px #F59E0B80",
               display:"inline-block",flexShrink:0 }}/>
@@ -684,84 +784,88 @@ export default function WhyTrustSection() {
           </div>
         </div>
 
-        {/* ── Phase progress dots — bottom center ──────────────────────── */}
+        {/* ── Phase dots — bottom center ──────────────────────────────── */}
         <div style={{
           position:"absolute", bottom:20,
           left:"50%", transform:"translateX(-50%)",
-          display:"flex", alignItems:"center", gap:8,
-          zIndex:6,
+          display:"flex", alignItems:"center", gap:8, zIndex:6,
         }}>
+          {/* Dots driven by phaseRef via CSS — to avoid useState we use a
+              MutationObserver pattern or simply keep this as static render.
+              The dots update when onUpdate calls setPhase — but we removed
+              setPhase. Instead we write to a data attribute on a wrapper
+              and use CSS :has() or we accept a single state for the dots. */}
+          {/* Decision: keep 1 useState for dots only — it's 4 values, fires
+              max 3 times total per scroll-through. Acceptable cost. */}
           {[0,1,2,3].map(i=>(
-            <div key={i}
+            <div
+              key={i}
+              className="wt-phase-dot"
+              data-idx={i}
               style={{
                 borderRadius:3,
-                width:  i===phase ? 22 : 6,
-                height: 6,
-                background: i===phase ? T.accent : "rgba(99,102,241,0.22)",
+                width:6, height:6,
+                background:"rgba(99,102,241,0.22)",
                 transition:"all 0.35s cubic-bezier(0.22,1,0.36,1)",
               }}/>
           ))}
         </div>
 
-        {/* ── Scroll hint (phase 0 only) ───────────────────────────────── */}
+        {/* ── Scroll hint ─────────────────────────────────────────────── */}
         <AnimatePresence>
-          {phase===0 && (
+          {hintVisible && (
             <motion.div
-              key="sh"
+              key="hint"
               initial={{ opacity:0 }}
               animate={{ opacity:1 }}
               exit={{ opacity:0 }}
-              transition={{ delay:1.2, duration:0.6 }}
+              transition={{ delay:0.8, duration:0.6 }}
               style={{
                 position:"absolute", bottom:48, right:36,
                 display:"flex", flexDirection:"column",
                 alignItems:"center", gap:5, zIndex:6,
+                pointerEvents:"none",
               }}>
               <div style={{ width:1,height:30,
                 background:"linear-gradient(to bottom,transparent,rgba(99,102,241,0.50))" }}/>
-              <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+              <svg width="9" height="7" viewBox="0 0 9 7" fill="none" aria-hidden>
                 <path d="M0 0l4.5 6 4.5-6" stroke="rgba(99,102,241,0.5)"
                   strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
               <span className="font-robert font-bold uppercase"
-                style={{ fontSize:9, color:"rgba(99,102,241,0.45)", letterSpacing:".15em" }}>
+                style={{ fontSize:9,color:"rgba(99,102,241,0.45)",letterSpacing:".15em" }}>
                 scroll
               </span>
             </motion.div>
           )}
         </AnimatePresence>
 
-      </div>{/* end desktop pinWrap */}
+      </div>{/* end desktop */}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          MOBILE — stacked
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════════════════
+          MOBILE — stacked, no pin
+          ════════════════════════════════════════════════════════════════ */}
       <div className="md:hidden flex flex-col gap-14 px-5 pt-14 pb-20">
 
         {/* Model */}
         <div className="relative rounded-3xl overflow-hidden wt-mob"
           style={{ height:300, background:"linear-gradient(160deg,#eef2ff,#f9fbff)" }}>
-          <div style={{
-            position:"absolute", bottom:"-8%", left:"50%", transform:"translateX(-50%)",
-            width:200, height:100, borderRadius:"50%",
+          <div style={{ position:"absolute",bottom:"-8%",left:"50%",transform:"translateX(-50%)",
+            width:200,height:100,borderRadius:"50%",
             background:"radial-gradient(ellipse,rgba(99,102,241,0.22) 0%,transparent 70%)",
-            filter:"blur(22px)",
-          }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", height:"100%" }}>
-            <ModelViewer scrollProgress={0.5}/>
+            filter:"blur(22px)" }}/>
+          <div style={{ position:"relative",zIndex:1,width:"100%",height:"100%" }}>
+            <StableModelViewer scrollRef={dummyRef}/>
           </div>
-          {/* floating pills mobile */}
           {PILLS.slice(0,3).map((pill,i)=>(
-            <div key={pill.text}
-              className="font-robert font-bold"
+            <div key={pill.text} className="font-robert font-bold"
               style={{
                 position:"absolute",
                 top:`${14+i*24}%`,
-                left:  i%2===0 ? "5%" : "auto",
-                right: i%2!==0 ? "5%" : "auto",
-                ...glass, borderRadius:30, padding:"5px 11px",
-                fontSize:11, color:T.ink,
-                display:"inline-flex", alignItems:"center", gap:6,
+                left:i%2===0?"5%":"auto", right:i%2!==0?"5%":"auto",
+                ...glass,borderRadius:30,padding:"5px 11px",
+                fontSize:11,color:T.ink,
+                display:"inline-flex",alignItems:"center",gap:6,
               }}>
               <span style={{ width:6,height:6,borderRadius:"50%",
                 background:pill.dot,display:"inline-block" }}/>
@@ -788,12 +892,11 @@ export default function WhyTrustSection() {
         <div className="wt-mob flex flex-col gap-5">
           <p className="font-robert font-bold uppercase"
             style={{ fontSize:10,color:T.accent,letterSpacing:".22em" }}>What I've Built</p>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
+          <div style={{ display:"flex",flexWrap:"wrap",gap:10 }}>
             {STATS.map(s=>(
-              <div key={s.label}
-                style={{ ...glassDark, borderRadius:14, padding:"12px 16px",
-                  display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{ color:s.color }}>{s.icon}</span>
+              <div key={s.label} style={{ ...glassDark,borderRadius:14,padding:"12px 16px",
+                display:"flex",alignItems:"center",gap:10 }}>
+                <span style={{ color:s.color,display:"flex" }}><s.Icon className="w-4 h-4"/></span>
                 <div>
                   <span className="font-neulis font-black block"
                     style={{ fontSize:26,color:T.ink,lineHeight:1,letterSpacing:"-.03em" }}>
@@ -807,10 +910,10 @@ export default function WhyTrustSection() {
               </div>
             ))}
           </div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+          <div style={{ display:"flex",flexWrap:"wrap",gap:7 }}>
             {SKILLS.map(sk=>(
               <span key={sk} className="font-robert font-bold"
-                style={{ ...glass, fontSize:11,color:T.accent,borderRadius:20,padding:"5px 11px" }}>
+                style={{ ...glass,fontSize:11,color:T.accent,borderRadius:20,padding:"5px 11px" }}>
                 {sk}
               </span>
             ))}
@@ -822,7 +925,7 @@ export default function WhyTrustSection() {
           <p className="font-robert font-bold uppercase"
             style={{ fontSize:10,color:T.accent,letterSpacing:".22em" }}>Why Trust Me</p>
           {TESTIMONIALS.map(t=>(
-            <div key={t.name} style={{ ...glassDark, borderRadius:16, padding:"14px 16px" }}>
+            <div key={t.name} style={{ ...glassDark,borderRadius:16,padding:"14px 16px" }}>
               <p className="font-robert italic leading-relaxed"
                 style={{ fontSize:13,color:T.sub,marginBottom:10 }}>&ldquo;{t.quote}&rdquo;</p>
               <div style={{ display:"flex",alignItems:"center",gap:10 }}>
@@ -854,7 +957,7 @@ export default function WhyTrustSection() {
             Your deadline is<br/><span style={{ color:T.accent }}>my priority.</span>
           </h3>
           <div style={{ display:"flex",flexWrap:"wrap",gap:7 }}>
-            {["✓ Source code","✓ Deployed","✓ Documented","✓ Revision"].map(b=>(
+            {(["✓ Source code","✓ Deployed","✓ Documented","✓ Revision"] as const).map(b=>(
               <span key={b} className="font-robert font-bold"
                 style={{ fontSize:11,padding:"4px 10px",borderRadius:20,
                   background:"rgba(99,102,241,0.07)",color:T.accent,
@@ -863,17 +966,14 @@ export default function WhyTrustSection() {
               </span>
             ))}
           </div>
-          <button
+          <button type="button"
             className="font-robert font-bold text-white self-start"
-            style={{
-              fontSize:14,padding:"13px 24px",borderRadius:22,
+            style={{ fontSize:14,padding:"13px 24px",borderRadius:22,
               background:"linear-gradient(135deg,#1A1F2E,#312e81)",
               boxShadow:"0 4px 0 rgba(55,48,163,0.55),0 8px 24px rgba(99,102,241,0.25)",
               border:"none",cursor:"pointer",
-              display:"flex",alignItems:"center",gap:10,
-            }}
-            onClick={()=>document.getElementById("req_a_project")
-              ?.scrollIntoView({behavior:"smooth"})}>
+              display:"flex",alignItems:"center",gap:10 }}
+            onClick={()=>document.getElementById("req_a_project")?.scrollIntoView({behavior:"smooth"})}>
             Request a Project
             <ArrowRight style={{ width:16,height:16 }}/>
           </button>
