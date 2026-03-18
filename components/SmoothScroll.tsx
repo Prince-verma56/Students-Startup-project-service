@@ -1,38 +1,31 @@
 "use client"
 
-import { useEffect } from "react"
-import Lenis from "lenis"
+import { useEffect, useState } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 export default function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    let locomotiveScroll: any;
 
-    const lenis = new Lenis({
-      duration: 1.2, // Reduced for better performance
-      lerp: 0.1,    // Fixed lerp value (must be between 0 and 1)
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Fixed easing
-      orientation: 'vertical',
-      gestureOrientation: 'vertical',
-      smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 2,
-    })
+    const init = async () => {
+      const LocomotiveScroll = (await import("locomotive-scroll")).default;
+      locomotiveScroll = new LocomotiveScroll({
+        lenisOptions: {
+          duration: 1.2,
+          lerp: 0.1,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+          smoothWheel: true,
+        },
+      })
 
-
-    lenis.on('scroll', ScrollTrigger.update)
-
-
-    const update = (time: number) => {
-      lenis.raf(time * 1000)
+      locomotiveScroll.on('scroll', ScrollTrigger.update)
     }
-    gsap.ticker.add(update)
-    gsap.ticker.lagSmoothing(1000, 16)
 
+    init();
 
     return () => {
-      lenis.destroy()
-      gsap.ticker.remove(update)
+      if (locomotiveScroll) locomotiveScroll.destroy()
     }
   }, [])
 

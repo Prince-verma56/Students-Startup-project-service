@@ -1,22 +1,22 @@
 "use client"
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
-import type { GroupProps } from '@react-three/fiber'
-import { Environment, Html, useGLTF, OrbitControls, Stage } from '@react-three/drei'
+import { Environment, Html, useGLTF, OrbitControls, Stage, Center } from '@react-three/drei'
 
-type ModelProps = GroupProps
-
-function AvatarModel(props: ModelProps) {
+function AvatarModel() {
   const { scene } = useGLTF('/models/MyChar3DModel2.glb')
-  return <primitive object={scene} {...props} />
+  // Cloning prevents the model from disappearing if the component re-mounts
+  const clonedScene = useMemo(() => scene.clone(), [scene])
+  return <primitive object={clonedScene} />
 }
 
 function CanvasLoader() {
   return (
     <Html center>
       <div className="rounded-full bg-white/80 px-4 py-2 text-xs text-gray-700 shadow-lg whitespace-nowrap">
-       <h1 className='font-zentry font-semibold text-xl tracking-wider'> Loading 3D Model…</h1>
+        {/* Restored your custom font here */}
+        <h1 className='font-zentry font-semibold text-xl tracking-wider'>Loading 3D Model…</h1>
       </div>
     </Html>
   )
@@ -26,16 +26,13 @@ export default function HeroModelCanvas({ className }: { className?: string }) {
   return (
     <div className={className}>
       <Canvas
-        dpr={[1, 2]}
+        dpr={[1, 1.5]} // Performance boost: 1.5 is plenty for web
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         camera={{ position: [0, 0, 4], fov: 35 }}
-        style={{ background: 'transparent' }}
       >
         <Suspense fallback={<CanvasLoader />}>
           <Stage environment="city" intensity={0.6} contactShadow={{ opacity: 0.5, blur: 2 }} adjustCamera={true}>
-            <AvatarModel rotation={[0, 2.5, 0]} />
-            <ambientLight intensity={0.2} />
-            <ambientLight intensity={0.2} position={[0, 0, 1]} />
+            <AvatarModel />
           </Stage>
           
           <OrbitControls 

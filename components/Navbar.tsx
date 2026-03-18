@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "motion/react";
+import { motion, AnimatePresence} from "motion/react";
 
 type NavItem = {
   id: string;
@@ -91,7 +91,7 @@ const Header: React.FC = () => {
   return (
     <motion.header
       className={[
-        "fixed top-0 left-0 w-full z-[100] transition-colors duration-500 px-4 md:px-6 lg:px-12",
+        "fixed top-0 left-0 w-full z-100 transition-colors duration-500 px-4 md:px-6 lg:px-12",
         hasScrolled ? "bg-white/20 backdrop-blur" : "bg-transparent",
       ].join(" ")}
       // Mount animation (first load) — slides down from above
@@ -115,7 +115,7 @@ const Header: React.FC = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.7, delay: 0.4 }}
         >
-          <Link href="#" id="hero" className="flex items-center flex-shrink-0">
+          <Link href="#" id="hero" className="flex items-center shrink-0">
             <h1 className="font-bold text-2xl sm:text-3xl lg:text-4xl font-florish whitespace-nowrap">
               LOGO
             </h1>
@@ -155,7 +155,7 @@ const Header: React.FC = () => {
 
         {/* Hamburger */}
         <motion.button
-          className="lg:hidden p-2 rounded-full border border-gray-300 flex-shrink-0 hover:bg-gray-100 transition-colors flex flex-col justify-center items-center"
+          className="lg:hidden p-2 rounded-full border border-gray-300 shrink-0 hover:bg-gray-100 transition-colors flex flex-col justify-center items-center"
           aria-label="Toggle menu"
           onClick={() => setIsOpen((v) => !v)}
           initial={{ opacity: 0 }}
@@ -163,11 +163,11 @@ const Header: React.FC = () => {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           <span className={`block w-5 h-0.5 bg-current transition-all duration-300 ease-in-out origin-center
-            ${isOpen ? "rotate-45 translate-y-[6px]" : ""}`} />
-          <span className={`block w-5 h-0.5 bg-current transition-all duration-300 ease-in-out origin-center my-[3px]
+            ${isOpen ? "rotate-45 translate-y-1.5" : ""}`} />
+          <span className={`block w-5 h-0.5 bg-current transition-all duration-300 ease-in-out origin-center my-0.75
             ${isOpen ? "opacity-0 scale-x-0" : ""}`} />
           <span className={`block w-5 h-0.5 bg-current transition-all duration-300 ease-in-out origin-center
-            ${isOpen ? "-rotate-45 -translate-y-[6px]" : ""}`} />
+            ${isOpen ? "-rotate-45 -translate-y-1.5" : ""}`} />
         </motion.button>
       </div>
 

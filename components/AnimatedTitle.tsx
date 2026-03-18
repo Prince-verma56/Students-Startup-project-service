@@ -2,16 +2,17 @@
 
 import { gsap } from 'gsap'
 import { useRef } from 'react'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+// import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
 import clsx from 'clsx'
 
 interface AnimatedTitleProps {
   title: string
   containerClass?: string
+  style?: React.CSSProperties
 }
 
-const AnimatedTitle: React.FC<AnimatedTitleProps> = ({ title, containerClass }) => {
+const AnimatedTitle: React.FC<AnimatedTitleProps> = ({ title, containerClass, style }) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useGSAP(() => {
@@ -42,7 +43,7 @@ const AnimatedTitle: React.FC<AnimatedTitleProps> = ({ title, containerClass }) 
   }, { scope: containerRef })
 
   return (
-    <div ref={containerRef} className={clsx('animated-title', containerClass)}>
+    <div ref={containerRef} className={clsx('animated-title', containerClass)} style={style}>
       {title.split('<br />').map((line, index) => (
         <div
           key={index}

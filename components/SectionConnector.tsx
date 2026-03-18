@@ -1,7 +1,4 @@
 "use client"
-// SectionConnector — a subtle visual bridge between any two sections.
-// Renders a thin gradient line + optional glow blob.
-// Usage: <SectionConnector from="#F5F4F0" to="#FFFFFF" />
 
 interface Props {
   from?: string   // color of section above
@@ -10,8 +7,8 @@ interface Props {
 }
 
 export default function SectionConnector({
-  from = "#F5F4F0",
-  to   = "#FFFFFF",
+  from = "#F9FBFF",
+  to   = "#F9FBFF",
   glow = true,
 }: Props) {
   return (
