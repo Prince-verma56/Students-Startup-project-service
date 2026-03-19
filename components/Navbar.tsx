@@ -107,7 +107,7 @@ const Header: React.FC = () => {
         opacity: { duration: 0.25 },
       }}
     >
-      <div className="mx-auto px-2 md:px-4 h-16 md:h-14 mt-12 flex items-center justify-between gap-4">
+      <div className="mx-auto px-2 md:px-4 h-16 md:h-14 mt-8 flex items-center justify-between gap-4">
 
         {/* Logo */}
         <motion.div
