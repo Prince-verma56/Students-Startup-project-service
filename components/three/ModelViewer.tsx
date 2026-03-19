@@ -66,17 +66,13 @@ export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: 
         dpr={[1, 1.5]}
         camera={{ position: [0, 0, 5], fov: 45 }}
         gl={{ antialias: true, alpha: true }}
-        style={{ background: "#eef2ff" }}
+        style={{ background: "transparent" }}
       >
-        <ambientLight intensity={1.5} />
-        <ambientLight intensity={2} />
+        <ambientLight intensity={2.5} />
         <directionalLight intensity={1.5} />
-
-
-
+        <directionalLight intensity={1.5} />
         <pointLight position={[10, 10, 10]} intensity={2} />
-        <pointLight position={[-10, -10, -10]} color="white" intensity={2} />
-        <pointLight position={[-10, -10, -10]} color="white" intensity={2} />
+        <pointLight position={[-10, -10, -10]} color="white" intensity={1.5} />
 
         <Suspense fallback={<LoadingBox />}>
           <Model scrollRef={scrollRef} />
@@ -89,7 +85,7 @@ export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: 
           dampingFactor={0.08}
           minPolarAngle={Math.PI / 2}
           maxPolarAngle={Math.PI / 2}
-          rotateSpeed={0.6}
+          rotateSpeed={10}
         />
       </Canvas>
     </div>

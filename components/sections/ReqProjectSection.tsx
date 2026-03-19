@@ -521,16 +521,23 @@ export default function RequestProjectSection(){
     const boot=()=>{
       ctx=gsap.context(()=>{
 
+        // Global refresh after creating ScrollTriggers
+        requestAnimationFrame(() => {
+          setTimeout(() => ScrollTrigger.refresh(), 100)
+        })
+
         // ── Convenience helpers ───────────────────────────────────────────────
         // Scrub parallax: tied to section scroll from bottom→top of viewport
         const scrollParallax=(extra?:object)=>({
           trigger:section, start:"top bottom", end:"bottom top",
           scrub:1.6, ...extra,
+          invalidateOnRefresh: true,
         })
         // Entrance trigger: fires when element enters viewport, reverses on exit
         const onEnter=(el:Element|null,start="top 88%")=>({
           trigger:el??section, start,
           toggleActions:"play none none reverse" as const,
+          invalidateOnRefresh: true,
         })
 
         // ── 1. TOP ACCENT LINE — draws from center outward ────────────────────
@@ -784,8 +791,8 @@ export default function RequestProjectSection(){
 
   return(
     <section ref={sectionRef} id="req_a_project" aria-label="Request a project"
-      className="relative w-full py-24 md:py-32 overflow-hidden"
-      style={{background:T.bg,isolation:"isolate"}}>
+      className="relative w-full py-24 md:py-32 overflow-visible"
+      style={{background:T.bg,isolation:"isolate",minHeight:"auto"}}>
 
       {/* ── BACKGROUND ───────────────────────────────────────────────────── */}
       <div aria-hidden className="absolute inset-0 pointer-events-none" style={{zIndex:0}}>

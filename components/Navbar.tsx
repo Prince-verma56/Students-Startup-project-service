@@ -138,7 +138,7 @@ const Header: React.FC = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isActive ? 1 : 0.5 }}
                 transition={{ duration: 0.6, delay: 0.5 + index * 0.08 }}
-              >
+              >  
                 {item.label}
                 {isActive && (
                   <motion.span

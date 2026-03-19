@@ -216,15 +216,37 @@ select {
     @apply border-border outline-ring/50;
   }
 
-  html {
-    @apply font-sans scroll-smooth;
-    scroll-padding-top: 6rem;
-    /* Account for fixed navbar */
-  }
+html {
+  @apply font-sans;
+  scroll-padding-top: 6rem;
+  overflow-x: hidden;
+  /* Account for fixed navbar */
+}
 
-  body {
-    @apply bg-background text-foreground;
-  }
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+body {
+  @apply bg-background text-foreground;
+}
 }
 
 /* Hamburger to X animations */

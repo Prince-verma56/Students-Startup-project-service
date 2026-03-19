@@ -86,9 +86,9 @@ function page() {
         </section>
 
         {/* Extra space at the very bottom to allow the last pinned section to complete */}
-        <div className="h-[150vh] bg-[#F9FBFF] relative z-50 flex items-end justify-center pb-20">
+        {/* <div className="h-[150vh] bg-[#F9FBFF] relative z-50 flex items-end justify-center pb-20">
           <p className="text-zinc-300 font-robert text-sm">© 2024 • Built with Intention</p>
-        </div>
+        </div> */}
       </main>
     </>
   )

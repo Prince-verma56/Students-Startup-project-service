@@ -22,6 +22,9 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
       infinite: false,
     })
 
+    // Add lenis class to html for CSS handling
+    document.documentElement.classList.add('lenis')
+
     const raf = (time: number) => {
       lenis.current?.raf(time)
       requestAnimationFrame(raf)
@@ -32,6 +35,7 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
     return () => {
       lenis.current?.destroy()
       lenis.current = null
+      document.documentElement.classList.remove('lenis')
     }
   }, [])
 
