@@ -219,7 +219,6 @@ select {
 html {
   @apply font-sans;
   scroll-padding-top: 6rem;
-  overflow-x: hidden;
   /* Account for fixed navbar */
 }
 

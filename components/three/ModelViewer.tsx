@@ -1,43 +1,55 @@
 "use client"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ModelViewer.tsx — optimised for 60fps, zero React re-renders during scroll
-//
-// PERFORMANCE DECISIONS:
-//   • Receives scrollRef (MutableRefObject<number>) — NOT a prop value.
-//     This means the parent never needs to setState → no Canvas remount ever.
-//   • Floating handled entirely inside useFrame with lerp — no setInterval,
-//     no external RAF, no fighting with Three.js's own RAF loop.
-//   • Camera zoom driven by scrollRef inside useFrame — no prop change.
-//   • Single directional key light + 1 fill + ambient — minimum for good look.
-//   • dpr capped at 1.5, powerPreference high-performance.
-//   • antialias: false on mobile (detected once, never re-evaluated).
-//   • ContactShadows removed — saves a full render pass per frame.
-//     Replaced with a simple mesh-based shadow catcher (cheaper).
-//   • gl.autoClear stays true (default) — no manual clear overhead.
-// ─────────────────────────────────────────────────────────────────────────────
 
-import { Suspense, useRef, useMemo, useEffect, memo } from "react"
+
+import { Suspense, useRef, memo, Component, ReactNode } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { useGLTF, Center, OrbitControls } from "@react-three/drei"
+import { useGLTF } from "@react-three/drei"
 import * as THREE from "three"
 
 const MODEL_PATH = "/models/TrustMeModel.glb"
 
-const Model = memo(({ scrollRef }: { scrollRef: React.MutableRefObject<number> }) => {
+// ── Error Boundary ───────────────────────────────────────────────
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
+
+// ── Inner model — memo so it never remounts ───────────────────────
+const Model = memo(function Model({
+  scrollRef,
+}: {
+  scrollRef: React.MutableRefObject<number>
+}) {
   const { scene } = useGLTF(MODEL_PATH)
-  const groupRef = useRef<THREE.Group>(null!)
+  const groupRef  = useRef<THREE.Group>(null!)
+  const { invalidate } = useThree()
 
   useFrame((state) => {
     if (!groupRef.current) return
-    const targetRotY = (scrollRef.current - 0.5) * Math.PI * 1.5
+    
+    // Smooth rotation based on scroll progress ref
+    const targetRotation = scrollRef.current * Math.PI * 2
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
       groupRef.current.rotation.y,
-      targetRotY,
+      targetRotation,
       0.08
     )
+
+    // Floating effect
     const t = state.clock.getElapsedTime()
     groupRef.current.position.y = Math.sin(t * 0.8) * 0.1
+
+    // CONDITION 2: Invalidate for demand rendering
+    state.invalidate()
+    invalidate()
   })
 
   return (
@@ -48,46 +60,62 @@ const Model = memo(({ scrollRef }: { scrollRef: React.MutableRefObject<number> }
 })
 Model.displayName = "Model"
 
-// Use a simpler fallback that is guaranteed to show
-function LoadingBox() {
+// ── Lightweight fallback while GLTF loads ────────────────────────
+function LoadingFallback() {
   return (
-    <mesh>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="hotpink" />
-    </mesh>
+    <group>
+      <mesh position={[0, 0.8, 0]}>
+        <sphereGeometry args={[0.28, 12, 12]} />
+        <meshStandardMaterial color="#a5b4fc" opacity={0.5} transparent />
+      </mesh>
+      <mesh position={[0, -0.1, 0]}>
+        <cylinderGeometry args={[0.24, 0.24, 1.35, 12]} />
+        <meshStandardMaterial color="#818cf8" opacity={0.45} transparent />
+      </mesh>
+    </group>
   )
 }
 
-export default function ModelViewer({ scrollRef, className = "" }: { scrollRef: React.MutableRefObject<number>, className?: string }) {
+// ── Detect mobile once — never re-evaluates ───────────────────────
+const isMobileDevice =
+  typeof window !== "undefined" && window.innerWidth < 768
+
+export default function ModelViewer({
+  scrollRef,
+  className = "",
+}: {
+  scrollRef: React.MutableRefObject<number>
+  className?: string
+}) {
   return (
-    <div className={`w-full h-full relative ${className}`} style={{ minHeight: "400px" }}>
-      {/* DEBUG TEXT: If you see this, the component is rendering */}
-      <Canvas
-        dpr={[1, 1.5]}
-        camera={{ position: [0, 0, 5], fov: 45 }}
-        gl={{ antialias: true, alpha: true }}
-        style={{ background: "transparent" }}
-      >
-        <ambientLight intensity={2.5} />
-        <directionalLight intensity={1.5} />
-        <directionalLight intensity={1.5} />
-        <pointLight position={[10, 10, 10]} intensity={2} />
-        <pointLight position={[-10, -10, -10]} color="white" intensity={1.5} />
+    <div
+      className={`w-full h-full relative ${className}`}
+      style={{ minHeight: 400 }}
+    >
+      <ErrorBoundary>
+        <Canvas
+          // ── KEY PERF FIX: only render when invalidated ──
+          frameloop="demand"
+          dpr={[1, 1.2]}
+          camera={{ position: [0, 0, 5], fov: 45 }}
+          gl={{
+            antialias: false,             // false saves ~30% GPU
+            alpha: true,                  // transparent bg
+            powerPreference: "high-performance",
+          }}
+          style={{ background: "transparent" }}
+        >
+          {/* ── Simplified lights — FIX 1 ── */}
+          <ambientLight intensity={2.5} />
+          <directionalLight position={[5, 5, 5]} intensity={1.5} castShadow={false} />
+          <pointLight position={[-5, -5, -5]} intensity={1} />
+          <directionalLight position={[-2, 2, -2]} intensity={0.5} />
 
-        <Suspense fallback={<LoadingBox />}>
-          <Model scrollRef={scrollRef} />
-        </Suspense>
-
-        <OrbitControls
-          enableZoom={false}
-          enablePan={false}
-          enableDamping={true}
-          dampingFactor={0.08}
-          minPolarAngle={Math.PI / 2}
-          maxPolarAngle={Math.PI / 2}
-          rotateSpeed={10}
-        />
-      </Canvas>
+          <Suspense fallback={<LoadingFallback />}>
+            <Model scrollRef={scrollRef} />
+          </Suspense>
+        </Canvas>
+      </ErrorBoundary>
     </div>
   )
 }

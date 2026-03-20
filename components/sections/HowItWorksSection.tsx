@@ -984,6 +984,7 @@ export default function HowItWorksSection(){
           trigger:pin, start:"top top",
           end:()=>`+=${getTotalScroll()*0.35}`,
           scrub:1.5,
+          invalidateOnRefresh:true,
         },
       })
     }
@@ -999,6 +1000,7 @@ export default function HowItWorksSection(){
           end:()=>`top+=${getTotalScroll()*0.45}`,
           containerAnimation:hTween,
           scrub:1,
+          invalidateOnRefresh:true,
         },
       })
     }
@@ -1293,7 +1295,8 @@ export default function HowItWorksSection(){
 
     ScrollTrigger.refresh()
     return()=>{
-      ScrollTrigger.getAll().forEach(t=>{try{t.kill(true)}catch(_){}})
+      ScrollTrigger.getAll().filter(t => t.vars.trigger === pin || t.vars.trigger === section || t.vars.trigger === track).forEach(t => t.kill())
+      gsap.killTweensOf(".hiw-heading, .sky-overlay, .journey-arrow, .scene-mobile, .scene-1, .scene-2, .scene-3, .scene-4, .exit-scene")
       try{ScrollTrigger.clearScrollMemory()}catch(_){}
     }
   },[ready])

@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useEffect, useRef } from "react"
-import { motion } from "motion/react"
+import { motion } from "framer-motion"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import CardFlip from "../kokonutui/card-flip"
@@ -277,7 +277,10 @@ export default function ServicesSection() {
       return () => observer.disconnect()
     }, section)
 
-    return () => { try { ctx.revert() } catch (_) {} }
+    return () => {
+      ctx.revert()
+      ScrollTrigger.getAll().filter(t => t.vars.trigger === section).forEach(t => t.kill())
+    }
   }, [])
 
   return (

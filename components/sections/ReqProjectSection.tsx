@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { motion, AnimatePresence, useMotionValue, useSpring } from "motion/react"
+import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import {

@@ -29,7 +29,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useMemo, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Check, ArrowRight, ArrowUpDown, MessageSquarePlus } from "lucide-react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
@@ -588,7 +588,8 @@ export default function ReviewSection() {
 
     return () => {
       clearTimeout(t)
-      try { ctx.revert() } catch (_) {}
+      ctx.revert()
+      ScrollTrigger.getAll().filter(t => t.vars.trigger === section).forEach(t => t.kill())
     }
   }, [])
 

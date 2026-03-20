@@ -35,7 +35,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ExternalLink, Github } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -611,7 +611,10 @@ export default function DemoSection() {
       return () => observer.disconnect();
     }, section);
 
-    return () => { try { ctx.revert(); } catch (_) {} };
+    return () => {
+      try { ctx.revert(); } catch (_) {}
+      ScrollTrigger.getAll().filter(t => t.vars.trigger === section).forEach(t => t.kill());
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

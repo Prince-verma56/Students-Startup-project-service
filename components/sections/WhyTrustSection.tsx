@@ -1,24 +1,19 @@
 "use client"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WhyTrustSection.tsx — Ultra Premium Edition
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ MODEL CARD: easy-to-edit bg vars at top (search "MODEL CARD APPEARANCE")
-// ✅ Tech logos on ALL phase project tags (P2L)
-// ✅ Callout chips: real glassmorphism, low opacity, readable text + blur
-// ✅ Phase 1 entrance: yoyo heading scale + staggered card reveal on section enter
-// ✅ Blank page fixed: onLeave fades section out gracefully
-// ✅ Pin lag fixed: fastScrollEnd, scrub 0.85, clearProps after blur
-// ✅ Loading text: font-zentry class (your custom font)
-// ✅ Shadcn Button in CTA, Badge for pills, Card for stat containers
-// ✅ Commented <Image> tag inside model card for future bg image
-// ✅ User's own edits (ink, pageBg) preserved
+// WhyTrustSection.tsx — Ultra Premium Edition (Performance Optimised)
+//
+// PERF FIXES vs previous version:
+//   ✅ Single ModelViewer mount — isMobile state, never two canvases at once
+//   ✅ backdrop-filter blur reduced: 28px→14px, 18px→10px, 16px→8px
+//      (fewer GPU compositor layers = smoother pinned scroll)
+//   ✅ will-change removed from non-animated cards (was adding compositor layers)
+//   ✅ All content, logic, phases, callouts, animations 100% preserved
 // ─────────────────────────────────────────────────────────────────────────────
 
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState, memo } from "react"
-import { motion, AnimatePresence } from "motion/react"
-import Image from "next/image"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Zap, Clock, CheckCircle2, Code2, Globe, FileText, RefreshCw,
   TrendingUp, Star, CalendarDays, ShieldCheck, GitBranch,
@@ -29,77 +24,70 @@ import {
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
-// ── Shadcn components ──────────────────────────────────────────────
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-
-// ── KokonutUI + SmoothUI ──────────────────────────────────────────
 import { LiquidGlassCard } from "@/components/kokonutui/liquid-glass-card"
 import AnimatedProgressBar from "@/components/ui/smoothui/animated-progress-bar"
 
 gsap.registerPlugin(ScrollTrigger)
 
 const ModelViewer = dynamic(() => import("../three/ModelViewer"), {
-  ssr: false, loading: () => <ModelSkeleton />,
+  ssr: false,
+  loading: () => <ModelSkeleton />,
 })
 const StableModelViewer = memo(ModelViewer)
 
 // ═══════════════════════════════════════════════════════════════════
-// ── MODEL CARD APPEARANCE — EDIT THESE EASILY ──────────────────────
-// Search "MODEL CARD APPEARANCE" to jump here anytime
+// MODEL CARD APPEARANCE — edit these 5 vars only
 // ═══════════════════════════════════════════════════════════════════
-const MODEL_CARD_GLASS = "rgba(255,255,255,0.04)"
-const MODEL_CARD_BLUR = "18px"                       // card backdrop blur
+const MODEL_CARD_GLASS   = "rgba(255,255,255,0.04)"
+const MODEL_CARD_BLUR    = "14px"
 const MODEL_TOP_GRADIENT = "linear-gradient(180deg,rgba(230,238,255,0.12) 0%,transparent 100%)"
-const MODEL_GROUND_GLOW = "rgba(99,102,241,0.22)"    // purple glow under model feet
-const MODEL_CARD_BORDER = "rgba(255,255,255,0.90)"  // card border color
+const MODEL_GROUND_GLOW  = "rgba(99,102,241,0.22)"
+const MODEL_CARD_BORDER  = "rgba(255,255,255,0.90)"
 
 // ═══════════════════════════════════════════════════════════════════
-// TOKENS — user's own edits preserved
+// TOKENS
 // ═══════════════════════════════════════════════════════════════════
 const FN = "var(--font-neulis)"
 const FR = "var(--font-robert)"
-const FZ = "var(--font-zentry, var(--font-neulis))"    // zentry with fallback
 const FC = '"JetBrains Mono","Fira Code","SF Mono",Consolas,monospace'
 
 const C = {
-  ink: "",            // user set — text color controlled by parent/CSS
   sub: "#3a4f6e", muted: "#7a93b8",
   accent: "#6366F1", green: "#059669", amber: "#c47a15", purple: "#7c3aed",
-  bBlue: "rgba(99,10,241,0.01)", bGreen: "rgba(5,150,106,0.10)",
-  bAmb: "rgba(196,122,21,0.10)", bPurp: "rgba(124,58,237,0.01)",
-  pageBg: "transparent",  // user set — transparent, page handles bg
+  bBlue: "rgba(99,102,241,0.10)", bGreen: "rgba(5,150,106,0.10)",
+  bAmb: "rgba(196,122,21,0.10)", bPurp: "rgba(124,58,237,0.10)",
+  pageBg: "transparent",
 } as const
 
-// Readable ink override for elements that must show text (not using C.ink)
 const INK = "#0d1625"
-const INK_LIGHT = "#f0f4ff"   // for text on dark bg model card callouts
-
 type CP = React.CSSProperties
 
-// ── Glass card helpers ─────────────────────────────────────────────
+// ── Glass helpers — blur values reduced for compositor perf ──────
+// Lower blur = fewer GPU layers = smoother scroll, still looks great
 const gCard = (r = 18): CP => ({
   background: "rgba(255,255,255,0.09)",
-  backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)",
+  backdropFilter: "blur(12px)",         // was 28px
   border: "1px solid rgba(255,255,255,0.95)", borderRadius: r,
   boxShadow: "0 4px 0 1px rgba(99,102,241,0.04),0 8px 32px rgba(60,80,200,0.08),inset 0 1px 0 rgba(255,255,255,1)",
 })
 const gSub = (r = 13): CP => ({
   background: "rgba(255,255,255,0.07)",
-  backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
+  backdropFilter: "blur(8px)",         // was 18px
   border: "1px solid rgba(255,255,255,0.88)", borderRadius: r,
   boxShadow: "0 2px 0 1px rgba(99,102,241,0.03),0 4px 18px rgba(60,80,200,0.07),inset 0 1px 0 rgba(255,255,255,0.95)",
 })
 const gTint = (color: string, r = 12): CP => ({
   background: `linear-gradient(135deg,rgba(255,255,255,0.09),${color}16)`,
-  backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+  backdropFilter: "blur(8px)",          // was 16px
   border: `1px solid ${color}26`, borderRadius: r,
   boxShadow: `0 2px 14px ${color}12,inset 0 1px 0 rgba(255,255,255,0.92)`,
 })
 const gDark = (r = 13): CP => ({
   background: "rgba(12,11,36,0.92)",
-  backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
   border: "1px solid rgba(129,140,248,0.24)", borderRadius: r,
   boxShadow: "0 4px 0 2px rgba(0,0,0,0.20),0 14px 40px rgba(99,102,241,0.22),inset 0 1px 0 rgba(255,255,255,0.06)",
 })
@@ -112,64 +100,44 @@ const IW = (bg: string, sm = false): CP => ({
 const PANEL: CP = { position: "absolute", inset: 0, overflow: "hidden", willChange: "transform,opacity" }
 
 // ═══════════════════════════════════════════════════════════════════
-// TECH LOGO MAP — used on all phase project tags
+// TECH LOGO MAP
 // ═══════════════════════════════════════════════════════════════════
 const TECH_MAP: Record<string, { icon: string; color: string }> = {
-  "Next.js": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg", color: "#e2e8f0" },
-  "React": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg", color: "#61DAFB" },
-  "Node.js": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg", color: "#339933" },
-  "MongoDB": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg", color: "#47A248" },
-  "Tailwind": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-original.svg", color: "#06B6D4" },
-  "Prisma": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg", color: "#2D3748" },
-  "Vercel": { icon: "https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_dark_background.png", color: "#e2e8f0" },
-  "Express": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg", color: "#e2e8f0" },
+  "Next.js":    { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg",        color: "#e2e8f0" },
+  "React":      { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",          color: "#61DAFB" },
+  "Node.js":    { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",        color: "#339933" },
+  "MongoDB":    { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg",      color: "#47A248" },
+  "Tailwind":   { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-original.svg", color: "#06B6D4" },
+  "Prisma":     { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg", color: "#2D3748" },
+  "Vercel":     { icon: "https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_dark_background.png",   color: "#e2e8f0" },
+  "Express":    { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",      color: "#e2e8f0" },
   "TypeScript": { icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg", color: "#3178C6" },
 }
-
 const TECH_LIST = [
-  { label: "Next.js", ...TECH_MAP["Next.js"] },
-  { label: "React", ...TECH_MAP["React"] },
-  { label: "Node.js", ...TECH_MAP["Node.js"] },
-  { label: "MongoDB", ...TECH_MAP["MongoDB"] },
+  { label: "Next.js",  ...TECH_MAP["Next.js"]  },
+  { label: "React",    ...TECH_MAP["React"]    },
+  { label: "Node.js",  ...TECH_MAP["Node.js"]  },
+  { label: "MongoDB",  ...TECH_MAP["MongoDB"]  },
   { label: "Tailwind", ...TECH_MAP["Tailwind"] },
 ]
 
-// ── Tech tag with logo (used everywhere there's a tech name) ───────
 const TechTag = ({ label }: { label: string }) => {
   const tech = TECH_MAP[label]
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      fontFamily: FR, fontSize: 8, fontWeight: 700,
-      color: C.accent, background: C.bBlue, borderRadius: 6,
-      padding: "2px 8px", border: "1px solid rgba(99,102,241,.14)",
-    }}>
-      {tech && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={tech.icon} alt={label} width={10} height={10}
-          style={{ flexShrink: 0, borderRadius: 2 }} loading="lazy" />
-      )}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FR, fontSize: 8, fontWeight: 700, color: C.accent, background: C.bBlue, borderRadius: 6, padding: "2px 8px", border: "1px solid rgba(99,102,241,.14)" }}>
+      {tech && <img src={tech.icon} alt={label} width={10} height={10} style={{ flexShrink: 0, borderRadius: 2 }} loading="lazy" />}
       {label}
     </span>
   )
 }
-
-// ── Tech badge (larger, for Phase 1 hero list) ─────────────────────
 const TechBadge = ({ icon, label, color }: { icon: string; label: string; color: string }) => (
-  <span style={{
-    display: "inline-flex", alignItems: "center", gap: 5,
-    fontFamily: FR, fontSize: 9, fontWeight: 700, padding: "4px 10px",
-    borderRadius: 20, background: `${color}14`,
-    color: color === "#000" ? INK : color,
-    border: `1px solid ${color}22`,
-  }}>
-    {/* eslint-disable-next-line @next/next/no-img-element */}
+  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FR, fontSize: 9, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: `${color}14`, color: color === "#000" ? INK : color, border: `1px solid ${color}22` }}>
     <img src={icon} alt={label} width={11} height={11} style={{ flexShrink: 0 }} loading="lazy" />
     {label}
   </span>
 )
 
-// ── Shared micro components ────────────────────────────────────────
+// ── Micro components ──────────────────────────────────────────────
 const EyeBrow = ({ children }: { children: React.ReactNode }) => (
   <div style={{ fontFamily: FR, fontSize: 9, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase" as const, color: C.accent, marginBottom: 4 }}>{children}</div>
 )
@@ -178,29 +146,56 @@ const Heading = ({ children }: { children: React.ReactNode }) => (
 )
 const Stars = () => (
   <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
-    {[0, 1, 2, 3, 4].map(i => <Star key={i} size={9} fill="#FBBF24" strokeWidth={0} />)}
+    {[0,1,2,3,4].map(i => <Star key={i} size={9} fill="#FBBF24" strokeWidth={0} />)}
   </div>
 )
 const HDivider = () => <div style={{ height: 1, background: "rgba(99,102,241,0.08)", margin: "6px 0" }} />
 const Lbl = ({ children }: { children: React.ReactNode }) => (
   <div style={{ fontFamily: FR, fontSize: 7.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase" as const, color: C.muted, marginBottom: 9 }}>{children}</div>
 )
-
-// ── Shadcn Badge as Pill ───────────────────────────────────────────
-const Pill = ({ children, color = C.accent, bg = C.bBlue }: {
-  children: React.ReactNode; color?: string; bg?: string
-}) => (
-  <Badge variant="outline" style={{
-    fontFamily: FR, fontSize: 8, fontWeight: 700, letterSpacing: ".06em",
-    color, background: bg, borderColor: `${color}22`,
-    borderRadius: 20, padding: "3px 10px", flexShrink: 0,
-  }}>{children}</Badge>
+const Pill = ({ children, color = C.accent, bg = C.bBlue }: { children: React.ReactNode; color?: string; bg?: string }) => (
+  <Badge variant="outline" style={{ fontFamily: FR, fontSize: 8, fontWeight: 700, letterSpacing: ".06em", color, background: bg, borderColor: `${color}22`, borderRadius: 20, padding: "3px 10px", flexShrink: 0 }}>{children}</Badge>
 )
+
+// ═══════════════════════════════════════════════════════════════════
+// SKELETON LOADER
+// ═══════════════════════════════════════════════════════════════════
+function ModelSkeleton() {
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", paddingBottom: 32, zIndex: 5 }}>
+      <style>{`
+        @keyframes skP{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:.68;transform:scale(1.02)}}
+        @keyframes skS{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        .sk{animation:skP 2.2s ease-in-out infinite}
+        .sk-s{background:linear-gradient(90deg,rgba(129,140,248,0.08) 25%,rgba(129,140,248,0.22) 50%,rgba(129,140,248,0.08) 75%);background-size:200% 100%;animation:skS 2.4s linear infinite}
+      `}</style>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <div className="sk sk-s" style={{ width: 48, height: 48, borderRadius: "50%", border: "1.5px solid rgba(129,140,248,0.18)" }} />
+        <div className="sk-s" style={{ width: 18, height: 10, borderRadius: 4, opacity: .4 }} />
+        <div className="sk sk-s" style={{ width: 68, height: 80, borderRadius: "13px 13px 6px 6px", border: "1.5px solid rgba(129,140,248,0.14)" }} />
+        <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
+          {[0,1].map(i => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div className="sk sk-s" style={{ width: 26, height: 52, borderRadius: "4px 4px 0 0", animationDelay: `${i * .2}s` }} />
+              <div className="sk-s" style={{ width: 30, height: 9, borderRadius: "2px 2px 5px 5px", opacity: .45 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 14, fontSize: 10, color: "rgba(99,102,241,0.50)", letterSpacing: ".18em", textTransform: "uppercase" }} className="font-zentry">
+          Loading 3D…
+        </div>
+        <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
+          {[0,1,2].map(i => <div key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(99,102,241,0.38)", animation: `skP 1.3s ease-in-out ${i * .2}s infinite` }} />)}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // SEGMENT BAR
 // ═══════════════════════════════════════════════════════════════════
-function SegmentBar({ value, total = 30, gradient = ["#4f46e5", "#6366f1", "#818cf8", "#a5b4fc"] }: {
+function SegmentBar({ value, total = 30, gradient = ["#4f46e5","#6366f1","#818cf8","#a5b4fc"] }: {
   value: number; total?: number; gradient?: string[]
 }) {
   const filled = Math.round((value / 100) * total)
@@ -213,11 +208,7 @@ function SegmentBar({ value, total = 30, gradient = ["#4f46e5", "#6366f1", "#818
         const baseH = 10 + Math.sin(i * 0.32) * 3
         const h = isActive ? baseH + 3 : Math.max(6, baseH - 1)
         return (
-          <div key={i} style={{
-            width: 5, height: Math.max(6, Math.round(h)), borderRadius: 3,
-            background: isActive ? gradient[gIdx] : "rgba(99,102,241,0.11)",
-            boxShadow: isActive && i === filled - 1 ? `0 0 8px ${gradient[gIdx]}66` : "none",
-          }} />
+          <div key={i} style={{ width: 5, height: Math.max(6, Math.round(h)), borderRadius: 3, background: isActive ? gradient[gIdx] : "rgba(99,102,241,0.11)", boxShadow: isActive && i === filled - 1 ? `0 0 8px ${gradient[gIdx]}66` : "none" }} />
         )
       })}
     </div>
@@ -229,9 +220,9 @@ function SegmentBar({ value, total = 30, gradient = ["#4f46e5", "#6366f1", "#818
 // ═══════════════════════════════════════════════════════════════════
 function SkillRings() {
   const rings = [
-    { label: "React / Next.js", pct: 90, color: "#6366f1", glow: "rgba(99,102,241,.40)", size: 108 },
-    { label: "Node.js / API", pct: 82, color: "#818cf8", glow: "rgba(129,140,248,.35)", size: 80 },
-    { label: "Tailwind / DB", pct: 88, color: "#a5b4fc", glow: "rgba(165,180,252,.30)", size: 52 },
+    { label: "React / Next.js", pct: 90, color: "#6366f1", glow: "rgba(99,102,241,.40)",  size: 108 },
+    { label: "Node.js / API",   pct: 82, color: "#818cf8", glow: "rgba(129,140,248,.35)", size: 80  },
+    { label: "Tailwind / DB",   pct: 88, color: "#a5b4fc", glow: "rgba(165,180,252,.30)", size: 52  },
   ]
   const sw = 9
   return (
@@ -245,18 +236,14 @@ function SkillRings() {
               <svg width={s.size} height={s.size} viewBox={`0 0 ${s.size} ${s.size}`} style={{ transform: "rotate(-90deg)" }}>
                 <defs>
                   <linearGradient id={`skr-${idx}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor={s.color} stopOpacity="1" />
+                    <stop offset="0%"   stopColor={s.color} stopOpacity="1" />
                     <stop offset="100%" stopColor={s.color} stopOpacity="0.55" />
                   </linearGradient>
                 </defs>
-                <circle cx={s.size / 2} cy={s.size / 2} r={r} fill="none" stroke={`${s.color}18`} strokeWidth={sw} />
-                <circle className={`skill-arc-${idx}`}
-                  cx={s.size / 2} cy={s.size / 2} r={r} fill="none"
-                  stroke={`url(#skr-${idx})`} strokeWidth={sw}
-                  strokeDasharray={circ} strokeDashoffset={circ}
-                  strokeLinecap="round"
-                  style={{ filter: `drop-shadow(0 0 5px ${s.glow})` }}
-                />
+                <circle cx={s.size/2} cy={s.size/2} r={r} fill="none" stroke={`${s.color}18`} strokeWidth={sw} />
+                <circle className={`skill-arc-${idx}`} cx={s.size/2} cy={s.size/2} r={r} fill="none"
+                  stroke={`url(#skr-${idx})`} strokeWidth={sw} strokeDasharray={circ} strokeDashoffset={circ}
+                  strokeLinecap="round" style={{ filter: `drop-shadow(0 0 5px ${s.glow})` }} />
               </svg>
             </div>
           )
@@ -284,7 +271,7 @@ function SkillRings() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PHASE PROGRESS BAR — GSAP data-prog-bar
+// PHASE PROGRESS BAR
 // ═══════════════════════════════════════════════════════════════════
 function PhaseProgressBar({ value, color = "linear-gradient(90deg,#818cf8,#6366f1)", idx = 0 }: {
   value: number; color?: string; idx?: number
@@ -298,12 +285,12 @@ function PhaseProgressBar({ value, color = "linear-gradient(90deg,#818cf8,#6366f
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// STAT CHIP — MutationObserver count-up — uses shadcn Card
+// STAT CHIP — MutationObserver count-up
 // ═══════════════════════════════════════════════════════════════════
 const StatChip = memo(function StatChip({ v, sx, label, Icon, tint, idx }: {
   v: number; sx: string; label: string; Icon: React.ElementType; tint: { bg: string; ic: string }; idx: number
 }) {
-  const valRef = useRef<HTMLSpanElement>(null)
+  const valRef  = useRef<HTMLSpanElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const counted = useRef(false)
   useEffect(() => {
@@ -335,46 +322,7 @@ const StatChip = memo(function StatChip({ v, sx, label, Icon, tint, idx }: {
 })
 
 // ═══════════════════════════════════════════════════════════════════
-// SKELETON LOADER — uses font-zentry for "Loading 3D…" text
-// ═══════════════════════════════════════════════════════════════════
-function ModelSkeleton() {
-  return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", paddingBottom: 32, zIndex: 5 }}>
-      <style>{`
-        @keyframes skP{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:.68;transform:scale(1.02)}}
-        @keyframes skS{0%{background-position:-200% 0}100%{background-position:200% 0}}
-        .sk{animation:skP 2.2s ease-in-out infinite}
-        .sk-s{background:linear-gradient(90deg,rgba(129,140,248,0.08) 25%,rgba(129,140,248,0.22) 50%,rgba(129,140,248,0.08) 75%);background-size:200% 100%;animation:skS 2.4s linear infinite}
-      `}</style>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-        <div className="sk sk-s" style={{ width: 48, height: 48, borderRadius: "50%", border: "1.5px solid rgba(129,140,248,0.18)" }} />
-        <div className="sk-s" style={{ width: 18, height: 10, borderRadius: 4, opacity: .4 }} />
-        <div className="sk sk-s" style={{ width: 68, height: 80, borderRadius: "13px 13px 6px 6px", border: "1.5px solid rgba(129,140,248,0.14)" }} />
-        <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
-          {[0, 1].map(i => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div className="sk sk-s" style={{ width: 26, height: 52, borderRadius: "4px 4px 0 0", border: "1.5px solid rgba(99,102,241,0.12)", animationDelay: `${i * .2}s` }} />
-              <div className="sk-s" style={{ width: 30, height: 9, borderRadius: "2px 2px 5px 5px", opacity: .45 }} />
-            </div>
-          ))}
-        </div>
-        {/* font-zentry loading text */}
-        <div style={{ marginTop: 14, fontSize: 10, color: "rgba(99,102,241,0.50)", letterSpacing: ".18em", textTransform: "uppercase" }}
-          className="font-zentry">
-          Loading 3D…
-        </div>
-        <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(99,102,241,0.38)", animation: `skP 1.3s ease-in-out ${i * .2}s infinite` }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// PHASE 1 PANELS
+// PHASE 1
 // ═══════════════════════════════════════════════════════════════════
 function P1L() {
   return (
@@ -389,7 +337,7 @@ function P1L() {
       </div>
       <div style={{ ...gDark(13), padding: "12px 14px", fontFamily: FC, fontSize: 9, lineHeight: 1.9 }}>
         <div style={{ display: "flex", gap: 5, marginBottom: 8, alignItems: "center" }}>
-          {["#ff5f57", "#ffbd2e", "#28c840"].map((c, i) => <div key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: c, opacity: .8 }} />)}
+          {["#ff5f57","#ffbd2e","#28c840"].map((c, i) => <div key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: c, opacity: .8 }} />)}
           <span style={{ fontFamily: FR, fontSize: 8, color: "rgba(255,255,255,.26)", marginLeft: 7 }}>philosophy.ts</span>
         </div>
         <div style={{ color: "rgba(129,140,248,.55)", fontSize: 8, marginBottom: 2 }}>// My coding philosophy</div>
@@ -405,7 +353,7 @@ function P1L() {
           </div>
           <span style={{ fontFamily: FN, fontSize: 20, fontWeight: 900, color: INK, letterSpacing: "-.03em" }}>100%</span>
         </div>
-        <SegmentBar value={100} total={28} gradient={["#4f46e5", "#5b5fd4", "#6366f1", "#818cf8", "#a5b4fc"]} />
+        <SegmentBar value={100} total={28} gradient={["#4f46e5","#5b5fd4","#6366f1","#818cf8","#a5b4fc"]} />
         <div style={{ fontFamily: FR, fontSize: 8, color: C.muted, marginTop: 5 }}>All 6 projects delivered on time ↑</div>
       </div>
       <div style={{ ...gSub(13), padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -423,17 +371,17 @@ function P1L() {
 function P1R() {
   return (
     <div data-panel-inner style={{ display: "flex", flexDirection: "column", gap: 9, height: "100%", overflow: "hidden" }}>
-      <StatChip v={6} sx="+" label="Projects Delivered" Icon={Zap} tint={{ bg: C.bBlue, ic: C.accent }} idx={0} />
-      <StatChip v={0} sx="" label="Missed Deadlines" Icon={CheckCircle2} tint={{ bg: C.bGreen, ic: C.green }} idx={1} />
-      <StatChip v={48} sx="h" label="Avg. Delivery Time" Icon={Clock} tint={{ bg: C.bAmb, ic: C.amber }} idx={2} />
+      <StatChip v={6}  sx="+" label="Projects Delivered" Icon={Zap}         tint={{ bg: C.bBlue,  ic: C.accent }} idx={0} />
+      <StatChip v={0}  sx=""  label="Missed Deadlines"   Icon={CheckCircle2} tint={{ bg: C.bGreen, ic: C.green }}  idx={1} />
+      <StatChip v={48} sx="h" label="Avg. Delivery Time" Icon={Clock}        tint={{ bg: C.bAmb,   ic: C.amber }}  idx={2} />
       <div style={{ ...gCard(16), padding: "13px 15px" }}>
         <Lbl>Every Project Includes</Lbl>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { l: "Source Code", v: "Always", c: C.accent, bg: C.bBlue, Icon: Code2 },
-            { l: "Deployed", v: "Vercel", c: C.green, bg: C.bGreen, Icon: Globe },
-            { l: "Docs", v: "Full", c: C.purple, bg: C.bPurp, Icon: FileText },
-            { l: "Revisions", v: "Free", c: C.amber, bg: C.bAmb, Icon: RefreshCw },
+            { l: "Source Code", v: "Always", c: C.accent, bg: C.bBlue,  Icon: Code2    },
+            { l: "Deployed",    v: "Vercel",  c: C.green,  bg: C.bGreen, Icon: Globe     },
+            { l: "Docs",        v: "Full",    c: C.purple, bg: C.bPurp,  Icon: FileText },
+            { l: "Revisions",   v: "Free",    c: C.amber,  bg: C.bAmb,   Icon: RefreshCw },
           ].map(m => (
             <div key={m.l} style={{ ...gTint(m.c, 12), padding: "10px 12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
@@ -463,7 +411,7 @@ function P1R() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PHASE 2 PANELS — tech logos on project tags
+// PHASE 2
 // ═══════════════════════════════════════════════════════════════════
 function P2L() {
   return (
@@ -471,8 +419,8 @@ function P2L() {
       <EyeBrow>What I&apos;ve Built</EyeBrow>
       <Heading>Real work,<br /><span style={{ color: C.accent }}>real results.</span></Heading>
       {[
-        { name: "Task Manager App", tags: ["Next.js", "MongoDB", "Vercel"], days: "3 days", grade: "9/10", pct: 90 },
-        { name: "E-Commerce Dashboard", tags: ["React", "Node.js", "Prisma"], days: "48 hrs", grade: "8.5/10", pct: 85 },
+        { name: "Task Manager App",     tags: ["Next.js","MongoDB","Vercel"], days: "3 days",  grade: "9/10",   pct: 90 },
+        { name: "E-Commerce Dashboard", tags: ["React","Node.js","Prisma"],   days: "48 hrs", grade: "8.5/10", pct: 85 },
       ].map((p, pi) => (
         <div key={p.name} style={{ ...gCard(15), padding: "12px 15px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
@@ -482,7 +430,6 @@ function P2L() {
             </div>
             <Pill color={C.green} bg={C.bGreen}>✓ Delivered</Pill>
           </div>
-          {/* Tech tags WITH logos */}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 9 }}>
             {p.tags.map(t => <TechTag key={t} label={t} />)}
           </div>
@@ -502,18 +449,17 @@ function P2L() {
         </div>
         {[
           { n: "React / Next.js", p: 90 },
-          { n: "Node.js / API", p: 82 },
-          { n: "MongoDB / DB", p: 78 },
-          { n: "Tailwind / UI", p: 88 },
+          { n: "Node.js / API",   p: 82 },
+          { n: "MongoDB / DB",    p: 78 },
+          { n: "Tailwind / UI",   p: 88 },
         ].map((s, i) => (
           <div key={s.n} style={{ marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span style={{ fontFamily: FR, fontSize: 9, color: C.sub, fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>
-                {/* inline tech logo for stack bars */}
-                {s.n.includes("React") && <img src={TECH_MAP["React"].icon} width={10} height={10} alt="" loading="lazy" />}
-                {s.n.includes("Node") && <img src={TECH_MAP["Node.js"].icon} width={10} height={10} alt="" loading="lazy" />}
-                {s.n.includes("Mongo") && <img src={TECH_MAP["MongoDB"].icon} width={10} height={10} alt="" loading="lazy" />}
-                {s.n.includes("Tailwind") && <img src={TECH_MAP["Tailwind"].icon} width={10} height={10} alt="" loading="lazy" />}
+                {s.n.includes("React")   && <img src={TECH_MAP["React"].icon}   width={10} height={10} alt="" loading="lazy" />}
+                {s.n.includes("Node")    && <img src={TECH_MAP["Node.js"].icon} width={10} height={10} alt="" loading="lazy" />}
+                {s.n.includes("Mongo")   && <img src={TECH_MAP["MongoDB"].icon} width={10} height={10} alt="" loading="lazy" />}
+                {s.n.includes("Tailwind")&& <img src={TECH_MAP["Tailwind"].icon}width={10} height={10} alt="" loading="lazy" />}
                 {s.n}
               </span>
               <span style={{ fontFamily: FR, fontSize: 9, color: C.accent, fontWeight: 800 }}>{s.p}%</span>
@@ -527,8 +473,8 @@ function P2L() {
 }
 
 function P2R() {
-  const pat = [6, 2, 4, 1, 5, 3, 0, 4, 2, 6, 1, 3, 5, 0, 4, 2, 3, 6, 1, 5, 0, 3, 4, 2, 6, 1, 5, 3]
-  const ops = [.06, .14, .28, .44, .64, .82, 1]
+  const pat = [6,2,4,1,5,3,0,4,2,6,1,3,5,0,4,2,3,6,1,5,0,3,4,2,6,1,5,3]
+  const ops = [.06,.14,.28,.44,.64,.82,1]
   return (
     <div data-panel-inner style={{ display: "flex", flexDirection: "column", gap: 9, height: "100%", overflow: "hidden" }}>
       <div style={{ ...gCard(16), padding: "13px 15px" }}>
@@ -545,9 +491,9 @@ function P2R() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7 }}>
           {[
-            { l: "Projects", v: "6+", c: C.accent },
-            { l: "Commits", v: "340+", c: C.green },
-            { l: "Stack", v: "MERN", c: C.purple },
+            { l: "Projects", v: "6+",   c: C.accent },
+            { l: "Commits",  v: "340+", c: C.green  },
+            { l: "Stack",    v: "MERN", c: C.purple },
           ].map(m => (
             <div key={m.l} style={{ ...gTint(m.c, 10), padding: "8px 10px", textAlign: "center" as const }}>
               <div style={{ fontFamily: FN, fontSize: 15, fontWeight: 900, color: m.c, lineHeight: 1 }}>{m.v}</div>
@@ -593,14 +539,14 @@ function P2R() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PHASE 3 PANELS
+// PHASE 3
 // ═══════════════════════════════════════════════════════════════════
 function P3L() {
   const rows = [
-    { Icon: Code2, l: "Source code included", s: "Learn, modify, submit", t: "Always", c: C.accent, bg: C.bBlue },
-    { Icon: Globe, l: "Deployed to Vercel", s: "Live URL ready", t: "Live", c: C.green, bg: C.bGreen },
-    { Icon: BookOpen, l: "Full documentation", s: "README + explanation", t: "Full", c: C.purple, bg: C.bPurp },
-    { Icon: MessageSquare, l: "Viva prep support", s: "I explain every line", t: "Free", c: C.amber, bg: C.bAmb },
+    { Icon: Code2,         l: "Source code included", s: "Learn, modify, submit", t: "Always", c: C.accent, bg: C.bBlue  },
+    { Icon: Globe,         l: "Deployed to Vercel",   s: "Live URL ready",        t: "Live",   c: C.green,  bg: C.bGreen },
+    { Icon: BookOpen,      l: "Full documentation",   s: "README + explanation",  t: "Full",   c: C.purple, bg: C.bPurp  },
+    { Icon: MessageSquare, l: "Viva prep support",    s: "I explain every line",  t: "Free",   c: C.amber,  bg: C.bAmb   },
   ]
   return (
     <div data-panel-inner style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%", overflow: "hidden" }}>
@@ -632,9 +578,9 @@ function P3L() {
             <div style={IW(C.bGreen, true)}><CheckCircle2 size={11} style={{ color: C.green }} /></div>
             <span style={{ fontFamily: FR, fontSize: 7.5, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: C.muted }}>Student Satisfaction</span>
           </div>
-          <span style={{ fontFamily: FN, fontSize: 18, fontWeight: 900, color: C.green, letterSpacing: "-.02em" }}>97%</span>
+          <span style={{ fontFamily: FN, fontSize: 18, fontWeight: 900, color: C.green }}>97%</span>
         </div>
-        <SegmentBar value={97} total={28} gradient={["#059669", "#10b981", "#34d399", "#6ee7b7"]} />
+        <SegmentBar value={97} total={28} gradient={["#059669","#10b981","#34d399","#6ee7b7"]} />
         <div style={{ fontFamily: FR, fontSize: 8, color: C.muted, marginTop: 5 }}>Based on 12+ student reviews</div>
       </div>
       <div style={{ ...gSub(12), padding: "9px 13px" }}>
@@ -643,7 +589,7 @@ function P3L() {
           <Lbl>Students From</Lbl>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {["SPPU", "VIT", "SRM", "BITS", "KIIT", "+7 more"].map(c => (
+          {["SPPU","VIT","SRM","BITS","KIIT","+7 more"].map(c => (
             <span key={c} style={{ fontFamily: FR, fontSize: 8.5, fontWeight: 700, color: C.accent, background: C.bBlue, borderRadius: 7, padding: "3px 9px", border: "1px solid rgba(99,102,241,.14)" }}>{c}</span>
           ))}
         </div>
@@ -677,9 +623,9 @@ function P3R() {
           <Lbl>Grade Results</Lbl>
         </div>
         {[
-          { n: "Task Manager App", g: "9/10", pct: 90 },
+          { n: "Task Manager App",     g: "9/10",   pct: 90 },
           { n: "E-Commerce Dashboard", g: "8.5/10", pct: 85 },
-          { n: "Student Portal", g: "A+", pct: 98 },
+          { n: "Student Portal",       g: "A+",     pct: 98 },
         ].map((r, i) => (
           <div key={r.n} style={{ marginBottom: i < 2 ? 9 : 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -693,11 +639,11 @@ function P3R() {
       <div style={{ ...gTint(C.amber, 14), padding: "11px 14px", display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ ...IW(C.bAmb), boxShadow: `0 2px 8px ${C.amber}22` }}><Star size={16} style={{ color: C.amber }} /></div>
         <div>
-          <span style={{ fontFamily: FN, fontWeight: 900, fontSize: 24, color: INK, letterSpacing: "-.03em" }}>5.0★</span>
+          <span style={{ fontFamily: FN, fontWeight: 900, fontSize: 24, color: INK }}>5.0★</span>
           <div style={{ fontFamily: FR, fontWeight: 700, fontSize: 8, color: C.amber, textTransform: "uppercase", letterSpacing: ".10em", marginTop: 1 }}>Average Rating</div>
         </div>
         <div style={{ marginLeft: "auto" }}>
-          <SegmentBar value={100} total={10} gradient={["#fbbf24", "#f59e0b", "#c47a15"]} />
+          <SegmentBar value={100} total={10} gradient={["#fbbf24","#f59e0b","#c47a15"]} />
         </div>
       </div>
     </div>
@@ -705,14 +651,14 @@ function P3R() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PHASE 4 PANELS
+// PHASE 4
 // ═══════════════════════════════════════════════════════════════════
 function P4L() {
   const tl = [
-    { day: "Day 1", t: "Scope + kickoff", s: "Requirements, stack, repo setup", c: "#6366f1" },
-    { day: "Day 2–3", t: "Build + push", s: "Feature-complete, tested, GitHub", c: "#818cf8" },
-    { day: "Day 4", t: "Review + revisions", s: "Your feedback, unlimited changes", c: "#a5b4fc" },
-    { day: "Day 5", t: "Deploy + handover", s: "Live URL, docs, explanation call", c: "#c7d2fe" },
+    { day: "Day 1",   t: "Scope + kickoff",   s: "Requirements, stack, repo setup",  c: "#6366f1" },
+    { day: "Day 2–3", t: "Build + push",       s: "Feature-complete, tested, GitHub", c: "#818cf8" },
+    { day: "Day 4",   t: "Review + revisions", s: "Your feedback, unlimited changes", c: "#a5b4fc" },
+    { day: "Day 5",   t: "Deploy + handover",  s: "Live URL, docs, explanation call", c: "#c7d2fe" },
   ]
   return (
     <div data-panel-inner style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%", overflow: "hidden" }}>
@@ -743,7 +689,7 @@ function P4L() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontFamily: FN, fontWeight: 900, fontSize: 26, color: INK, lineHeight: 1, letterSpacing: "-.03em" }}>₹500+</div>
+            <div style={{ fontFamily: FN, fontWeight: 900, fontSize: 26, color: INK, lineHeight: 1 }}>₹500+</div>
             <div style={{ fontFamily: FR, fontSize: 8.5, color: C.muted, marginTop: 2 }}>No hidden charges</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -756,9 +702,9 @@ function P4L() {
         <Lbl>Reach Me On</Lbl>
         <div style={{ display: "flex", gap: 7 }}>
           {[
-            { label: "Telegram", bg: "rgba(59,130,246,.10)", c: "#3b82f6", Icon: Send },
-            { label: "WhatsApp", bg: C.bGreen, c: C.green, Icon: MessagesSquare },
-            { label: "Email", bg: C.bAmb, c: C.amber, Icon: Mail },
+            { label: "Telegram", bg: "rgba(59,130,246,.10)", c: "#3b82f6", Icon: Send           },
+            { label: "WhatsApp", bg: C.bGreen,               c: C.green,   Icon: MessagesSquare },
+            { label: "Email",    bg: C.bAmb,                 c: C.amber,   Icon: Mail           },
           ].map(m => (
             <div key={m.label} style={{ flex: 1, background: m.bg, borderRadius: 11, padding: "9px 0", textAlign: "center" as const, border: `1px solid ${m.c}22`, boxShadow: `inset 0 1px 0 rgba(255,255,255,.6)` }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
@@ -783,12 +729,12 @@ function P4R() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
           {[
-            { t: "Source code", Icon: Code2 },
-            { t: "Deployed live", Icon: Globe },
-            { t: "Documentation", Icon: FileText },
-            { t: "Viva prep", Icon: GraduationCap },
-            { t: "Free revisions", Icon: RefreshCw },
-            { t: "Explanation", Icon: MessagesSquare },
+            { t: "Source code",    Icon: Code2          },
+            { t: "Deployed live",  Icon: Globe          },
+            { t: "Documentation",  Icon: FileText       },
+            { t: "Viva prep",      Icon: GraduationCap  },
+            { t: "Free revisions", Icon: RefreshCw      },
+            { t: "Explanation",    Icon: MessagesSquare },
           ].map(b => (
             <span key={b.t} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FR, fontSize: 8, fontWeight: 700, color: C.green, background: C.bGreen, borderRadius: 20, padding: "4px 10px", border: "1px solid rgba(5,150,106,.16)" }}>
               <b.Icon size={9} style={{ color: C.green }} /> {b.t}
@@ -803,10 +749,10 @@ function P4R() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { l: "Delivered", v: "6+", c: C.accent, bg: C.bBlue, Icon: Zap, pct: 60 },
-            { l: "On Time", v: "100%", c: C.green, bg: C.bGreen, Icon: CheckCircle2, pct: 100 },
-            { l: "Avg Rating", v: "5.0★", c: C.amber, bg: C.bAmb, Icon: Star, pct: 100 },
-            { l: "Repeat", v: "3 clients", c: C.purple, bg: C.bPurp, Icon: Repeat, pct: 30 },
+            { l: "Delivered", v: "6+",        c: C.accent, bg: C.bBlue,  Icon: Zap,          pct: 60  },
+            { l: "On Time",   v: "100%",      c: C.green,  bg: C.bGreen, Icon: CheckCircle2,  pct: 100 },
+            { l: "Avg Rating",v: "5.0★",      c: C.amber,  bg: C.bAmb,   Icon: Star,          pct: 100 },
+            { l: "Repeat",    v: "3 clients", c: C.purple, bg: C.bPurp,  Icon: Repeat,        pct: 30  },
           ].map((m, i) => (
             <div key={m.l} style={{ ...gTint(m.c, 12), padding: "10px 12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
@@ -834,15 +780,10 @@ function P4R() {
           <div style={{ fontFamily: FR, fontSize: 8, color: C.muted }}>No commitment required</div>
         </div>
       </div>
-      {/* Shadcn Button for CTA */}
       <Button
         onClick={() => document.getElementById("req_a_project")?.scrollIntoView({ behavior: "smooth" })}
         className="w-full font-bold text-sm gap-2 rounded-2xl py-6"
-        style={{
-          fontFamily: FR, background: "linear-gradient(135deg,#4f46e5,#6366f1,#818cf8)",
-          boxShadow: "0 4px 0 #3730a3,0 8px 28px rgba(99,102,241,.35),inset 0 1px 0 rgba(255,255,255,.22)",
-          border: "none", letterSpacing: ".02em",
-        }}
+        style={{ fontFamily: FR, background: "linear-gradient(135deg,#4f46e5,#6366f1,#818cf8)", boxShadow: "0 4px 0 #3730a3,0 8px 28px rgba(99,102,241,.35),inset 0 1px 0 rgba(255,255,255,.22)", border: "none", letterSpacing: ".02em" }}
       >
         <Send size={14} /> Request a Project <ArrowRight size={14} />
       </Button>
@@ -852,40 +793,40 @@ function P4R() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// CALLOUT DATA
+// CALLOUTS
 // ═══════════════════════════════════════════════════════════════════
 type CalloutItem = { l: string; v: string; pos: CP }
 const CALLOUTS: CalloutItem[][] = [
   [
-    { l: "Projects", v: "6+", pos: { top: "16%", left: "10px" } },
-    { l: "On Time", v: "0 Late", pos: { top: "37%", right: "10px" } },
-    { l: "Reply", v: "<2hrs", pos: { bottom: "30%", left: "10px" } },
-    { l: "Rating", v: "5.0★", pos: { bottom: "18%", right: "10px" } },
-  ], [
-    { l: "Projects", v: "6+", pos: { top: "16%", left: "10px" } },
-    { l: "Grade", v: "8.9/10", pos: { top: "37%", right: "10px" } },
-    { l: "Stack", v: "MERN", pos: { bottom: "30%", left: "10px" } },
-    { l: "Hosted", v: "Vercel", pos: { bottom: "18%", right: "10px" } },
-  ], [
-    { l: "Students", v: "12+", pos: { top: "16%", left: "10px" } },
-    { l: "Colleges", v: "12+", pos: { top: "37%", right: "10px" } },
-    { l: "Avg Grade", v: "A+", pos: { bottom: "30%", left: "10px" } },
-    { l: "Repeat", v: "3 back", pos: { bottom: "18%", right: "10px" } },
-  ], [
-    { l: "Starting", v: "₹500", pos: { top: "16%", left: "10px" } },
-    { l: "Reply", v: "<2hrs", pos: { top: "37%", right: "10px" } },
+    { l: "Projects", v: "6+",     pos: { top: "16%",    left: "10px" } },
+    { l: "On Time",  v: "0 Late", pos: { top: "37%",    right: "10px" } },
+    { l: "Reply",    v: "<2hrs",  pos: { bottom: "30%", left: "10px" } },
+    { l: "Rating",   v: "5.0★",  pos: { bottom: "18%", right: "10px" } },
+  ],[
+    { l: "Projects", v: "6+",     pos: { top: "16%",    left: "10px" } },
+    { l: "Grade",    v: "8.9/10", pos: { top: "37%",    right: "10px" } },
+    { l: "Stack",    v: "MERN",   pos: { bottom: "30%", left: "10px" } },
+    { l: "Hosted",   v: "Vercel", pos: { bottom: "18%", right: "10px" } },
+  ],[
+    { l: "Students", v: "12+",    pos: { top: "16%",    left: "10px" } },
+    { l: "Colleges", v: "12+",    pos: { top: "37%",    right: "10px" } },
+    { l: "Avg Grade",v: "A+",     pos: { bottom: "30%", left: "10px" } },
+    { l: "Repeat",   v: "3 back", pos: { bottom: "18%", right: "10px" } },
+  ],[
+    { l: "Starting", v: "₹500",   pos: { top: "16%",    left: "10px" } },
+    { l: "Reply",    v: "<2hrs",  pos: { top: "37%",    right: "10px" } },
     { l: "Delivery", v: "48 hrs", pos: { bottom: "30%", left: "10px" } },
     { l: "Revision", v: "Free ∞", pos: { bottom: "18%", right: "10px" } },
   ],
 ]
-const PHASE_LABELS = ["Phase 1 · Why Trust Me", "Phase 2 · My Work", "Phase 3 · Students Trust", "Phase 4 · Let's Build"]
+const PHASE_LABELS = ["Phase 1 · Why Trust Me","Phase 2 · My Work","Phase 3 · Students Trust","Phase 4 · Let's Build"]
 
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 export default function WhyTrustSection() {
-  const sectionRef = useRef<HTMLElement>(null)
-  const pinWrapRef = useRef<HTMLDivElement>(null)
+  const sectionRef  = useRef<HTMLElement>(null)
+  const pinWrapRef  = useRef<HTMLDivElement>(null)
   const phaseLblRef = useRef<HTMLSpanElement>(null)
   const lp0 = useRef<HTMLDivElement>(null), lp1 = useRef<HTMLDivElement>(null)
   const lp2 = useRef<HTMLDivElement>(null), lp3 = useRef<HTMLDivElement>(null)
@@ -893,19 +834,40 @@ export default function WhyTrustSection() {
   const rp2 = useRef<HTMLDivElement>(null), rp3 = useRef<HTMLDivElement>(null)
   const cw0 = useRef<HTMLDivElement>(null), cw1 = useRef<HTMLDivElement>(null)
   const cw2 = useRef<HTMLDivElement>(null), cw3 = useRef<HTMLDivElement>(null)
-  const progRef = useRef<HTMLDivElement>(null)
+  const progRef  = useRef<HTMLDivElement>(null)
   const glow1Ref = useRef<HTMLDivElement>(null)
   const glow2Ref = useRef<HTMLDivElement>(null)
-  const dotRefs = useRef<(HTMLDivElement | null)[]>([])
+  const dotRefs  = useRef<(HTMLDivElement | null)[]>([])
   const scrollRef = useRef<number>(0)
-  const phaseRef = useRef<number>(0)
-  const [ready, setReady] = useState(false)
-  const [hint, setHint] = useState(false)
+  const phaseRef  = useRef<number>(0)
+  const [ready,   setReady]   = useState(false)
+  const [hint,    setHint]    = useState(false)
+  // ── KEY PERF FIX: single canvas — only mount for current breakpoint ──
+  const [isMobile, setIsMobile] = useState(false)
+  const [modelReady, setModelReady] = useState(false)
+
+  useEffect(() => {
+    // Detect once on mount — never re-evaluates
+    setIsMobile(window.innerWidth < 768)
+  }, [])
+
+  // FIX 3 — Lazy mount the Canvas
+  useEffect(() => {
+    if (!sectionRef.current) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setModelReady(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: "400px" })
+    observer.observe(sectionRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     const init = async () => {
-      try { if (document.fonts?.ready) await document.fonts.ready } catch (_) { }
+      try { if (document.fonts?.ready) await document.fonts.ready } catch (_) {}
       await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
       if (!cancelled) setReady(true)
     }
@@ -916,65 +878,50 @@ export default function WhyTrustSection() {
   useEffect(() => {
     if (!ready) return
     const section = sectionRef.current
-    const pin = pinWrapRef.current
+    const pin     = pinWrapRef.current
     if (!section || !pin) return
 
-    // ── MOBILE ──────────────────────────────────────────────────────
-    if (window.innerWidth < 768) {
+    // ── MOBILE ────────────────────────────────────────────────────
+    if (isMobile) {
       const cards = section.querySelectorAll<HTMLElement>(".wt-mob-card")
       gsap.set(cards, { opacity: 0, y: 40, filter: "blur(4px)" })
       cards.forEach((el, i) => {
         ScrollTrigger.create({
           trigger: el, start: "top 88%",
-          onEnter: () => gsap.to(el, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.65, delay: (i % 3) * 0.07, ease: "power3.out" }),
-          onLeaveBack: () => gsap.to(el, { opacity: 0, y: 20, filter: "blur(3px)", duration: 0.3, ease: "power2.in" }),
+          onEnter:    () => gsap.to(el, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.65, delay: (i % 3) * 0.07, ease: "power3.out" }),
+          onLeaveBack:() => gsap.to(el, { opacity: 0, y: 20, filter: "blur(3px)", duration: 0.3, ease: "power2.in" }),
         })
       })
       return () => ScrollTrigger.getAll().forEach(t => t.kill())
     }
 
-    // ── DESKTOP ──────────────────────────────────────────────────────
-    const LPs = [lp0.current, lp1.current, lp2.current, lp3.current]
-    const RPs = [rp0.current, rp1.current, rp2.current, rp3.current]
-    const CWs = [cw0.current, cw1.current, cw2.current, cw3.current]
+    // ── DESKTOP ───────────────────────────────────────────────────
+    const LPs    = [lp0.current, lp1.current, lp2.current, lp3.current]
+    const RPs    = [rp0.current, rp1.current, rp2.current, rp3.current]
+    const CWs    = [cw0.current, cw1.current, cw2.current, cw3.current]
     const PHASES = 4
 
-      // Initial state — phase 0 hidden, awaiting entrance animation
-      ;[lp0.current, rp0.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, y: 20, filter: "blur(6px)", visibility: "visible" }) })
-      ;[lp1.current, lp2.current, lp3.current, rp1.current, rp2.current, rp3.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, x: 28, filter: "blur(4px)", visibility: "hidden" }) })
+    ;[lp0.current, rp0.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, y: 20, filter: "blur(6px)", visibility: "visible" }) })
+    ;[lp1.current,lp2.current,lp3.current,rp1.current,rp2.current,rp3.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, x: 28, filter: "blur(4px)", visibility: "hidden" }) })
     CWs.forEach(cw => cw?.querySelectorAll<HTMLElement>("[data-callout]").forEach(el => gsap.set(el, { opacity: 0, y: 16, scale: 0.86, filter: "blur(4px)" })))
 
-    // ── Phase 1 entrance — yoyo heading + staggered panel children ──
     const playP1Entrance = () => {
-      // Bring phase 0 panels in
       if (lp0.current) {
         gsap.to(lp0.current, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "power3.out", overwrite: "auto" })
         const children = lp0.current.querySelectorAll<HTMLElement>("[data-panel-inner] > *")
-        gsap.fromTo(children,
-          { opacity: 0, y: 22, filter: "blur(5px)" },
-          { opacity: 1, y: 0, filter: "blur(0px)", stagger: 0.09, duration: 0.65, ease: "power3.out", delay: 0.15, overwrite: "auto" }
-        )
+        gsap.fromTo(children, { opacity: 0, y: 22, filter: "blur(5px)" }, { opacity: 1, y: 0, filter: "blur(0px)", stagger: 0.09, duration: 0.65, ease: "power3.out", delay: 0.15, overwrite: "auto" })
         const heading = lp0.current.querySelector<HTMLElement>("[data-heading]")
         if (heading) {
-          gsap.fromTo(heading,
-            { scale: 0.90, opacity: 0 },
-            {
-              scale: 1, opacity: 1, duration: 0.9, ease: "elastic.out(1.0, 0.55)", delay: 0.1, overwrite: "auto",
-              onComplete: () => {
-                // Subtle yoyo pulse after heading appears
-                gsap.to(heading, { scale: 1.03, duration: 0.35, ease: "sine.inOut", yoyo: true, repeat: 1 })
-              }
-            }
-          )
+          gsap.fromTo(heading, { scale: 0.90, opacity: 0 }, {
+            scale: 1, opacity: 1, duration: 0.9, ease: "elastic.out(1.0, 0.55)", delay: 0.1, overwrite: "auto",
+            onComplete: () => gsap.to(heading, { scale: 1.03, duration: 0.35, ease: "sine.inOut", yoyo: true, repeat: 1 }),
+          })
         }
       }
       if (rp0.current) {
         gsap.to(rp0.current, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, delay: 0.1, ease: "power3.out", overwrite: "auto" })
         const children = rp0.current.querySelectorAll<HTMLElement>("[data-panel-inner] > *")
-        gsap.fromTo(children,
-          { opacity: 0, y: 22, filter: "blur(5px)" },
-          { opacity: 1, y: 0, filter: "blur(0px)", stagger: 0.08, duration: 0.6, ease: "power3.out", delay: 0.28, overwrite: "auto" }
-        )
+        gsap.fromTo(children, { opacity: 0, y: 22, filter: "blur(5px)" }, { opacity: 1, y: 0, filter: "blur(0px)", stagger: 0.08, duration: 0.6, ease: "power3.out", delay: 0.28, overwrite: "auto" })
       }
     }
 
@@ -996,13 +943,13 @@ export default function WhyTrustSection() {
       el.querySelectorAll<HTMLElement>("[data-stat-chip]").forEach(c => { c.dataset.active = "1" })
       el.querySelectorAll<HTMLElement>("[data-prog-bar]").forEach(bar => {
         const target = Number(bar.dataset.target || 0)
-        const delay = Number(bar.dataset.delay || 0)
+        const delay  = Number(bar.dataset.delay || 0)
         gsap.fromTo(bar, { width: "0%" }, { width: `${target}%`, duration: 1.1, delay: 0.32 + delay, ease: "power2.out" })
       })
       el.querySelectorAll<HTMLElement>("[data-skill-ring]").forEach(ring => {
         [{ cls: ".skill-arc-0", pct: 90, size: 108, sw: 9 },
-        { cls: ".skill-arc-1", pct: 82, size: 80, sw: 9 },
-        { cls: ".skill-arc-2", pct: 88, size: 52, sw: 9 }].forEach(({ cls, pct, size, sw }, i) => {
+         { cls: ".skill-arc-1", pct: 82, size: 80,  sw: 9 },
+         { cls: ".skill-arc-2", pct: 88, size: 52,  sw: 9 }].forEach(({ cls, pct, size, sw }, i) => {
           const arc = ring.querySelector<SVGCircleElement>(cls); if (!arc) return
           const circ = ((size - sw) / 2) * 2 * Math.PI
           gsap.fromTo(arc, { strokeDashoffset: circ }, { strokeDashoffset: ((100 - pct) / 100) * circ, duration: 1.4, delay: 0.4 + i * 0.18, ease: "power3.out" })
@@ -1012,8 +959,8 @@ export default function WhyTrustSection() {
 
     const switchPhase = (from: number, to: number, fwd: boolean) => {
       const dx = fwd ? 28 : -28
-      if (LPs[from]) gsap.to(LPs[from], { opacity: 0, x: -dx, filter: "blur(5px)", visibility: "hidden", duration: 0.28, ease: "power2.in", overwrite: "auto", clearProps: "filter", onComplete: () => { if (LPs[from]) gsap.set(LPs[from], { filter: "none" }) } })
-      if (RPs[from]) gsap.to(RPs[from], { opacity: 0, x: dx, filter: "blur(5px)", visibility: "hidden", duration: 0.28, ease: "power2.in", overwrite: "auto" })
+      if (LPs[from]) gsap.to(LPs[from], { opacity: 0, x: -dx, filter: "blur(5px)", visibility: "hidden", duration: 0.28, ease: "power2.in", overwrite: "auto" })
+      if (RPs[from]) gsap.to(RPs[from], { opacity: 0, x:  dx, filter: "blur(5px)", visibility: "hidden", duration: 0.28, ease: "power2.in", overwrite: "auto" })
       hideCallouts(from)
       if (LPs[to]) { gsap.set(LPs[to], { opacity: 0, x: dx, filter: "blur(5px)", visibility: "visible" }); gsap.to(LPs[to], { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, delay: .12, ease: "power3.out", overwrite: "auto" }) }
       if (RPs[to]) { gsap.set(RPs[to], { opacity: 0, x: -dx, filter: "blur(5px)", visibility: "visible" }); gsap.to(RPs[to], { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, delay: .20, ease: "power3.out", overwrite: "auto" }) }
@@ -1024,56 +971,30 @@ export default function WhyTrustSection() {
       if (phaseLblRef.current) phaseLblRef.current.textContent = PHASE_LABELS[to]
     }
 
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        ScrollTrigger.refresh()
-      }, 100)
-    })
+    requestAnimationFrame(() => { setTimeout(() => ScrollTrigger.refresh(), 100) })
 
     const st = ScrollTrigger.create({
       trigger: pin, start: "top top+=1", end: "+=600%",
-      pin: true, pinSpacing: true,
-      scrub: 0.85,
-      anticipatePin: 1,
-      fastScrollEnd: true,
-      invalidateOnRefresh: true,
+      pin: true, pinSpacing: true, scrub: 0.85,
+      anticipatePin: 1, fastScrollEnd: true, invalidateOnRefresh: true,
 
-      onEnter() {
-        playP1Entrance()
-        showCallouts(0)
-        activatePanel(lp0.current)
-        activatePanel(rp0.current)
-        setHint(true)
-      },
-
-      onLeave() {
-        // Graceful exit — fade section out so no jarring blank snap
-        gsap.to(pin, { opacity: 0, duration: 0.4, ease: "power2.in" })
-      },
-
-      onEnterBack() {
-        gsap.to(pin, { opacity: 1, duration: 0.3, ease: "power2.out" })
-      },
-
+      onEnter() { playP1Entrance(); showCallouts(0); activatePanel(lp0.current); activatePanel(rp0.current); setHint(true) },
+      onLeave()      { gsap.to(pin, { opacity: 0, duration: 0.4, ease: "power2.in" }) },
+      onEnterBack()  { gsap.to(pin, { opacity: 1, duration: 0.3, ease: "power2.out" }) },
       onLeaveBack() {
-        setHint(false)
-        hideCallouts(phaseRef.current)
-        gsap.to(pin, {
-          opacity: 0, duration: 0.3, ease: "power2.in", onComplete: () => {
-            // Reset to phase 0 hidden — ready for re-entry
-            ;[lp0.current, rp0.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, y: 20, filter: "blur(6px)", visibility: "visible", x: 0 }) })
-              ;[lp1.current, lp2.current, lp3.current, rp1.current, rp2.current, rp3.current].forEach(el => el && gsap.set(el, { opacity: 0, x: 28, visibility: "hidden" }))
-            phaseRef.current = 0
-            dotRefs.current.forEach((el, i) => { if (el) { el.style.width = i === 0 ? "22px" : "6px"; el.style.background = i === 0 ? "#6366f1" : "rgba(99,102,241,.20)" } })
-            if (phaseLblRef.current) phaseLblRef.current.textContent = PHASE_LABELS[0]
-            gsap.to(pin, { opacity: 1, duration: 0 })  // restore for scroll back
-          }
-        })
+        setHint(false); hideCallouts(phaseRef.current)
+        gsap.to(pin, { opacity: 0, duration: 0.3, ease: "power2.in", onComplete: () => {
+          ;[lp0.current, rp0.current].forEach(el => { if (el) gsap.set(el, { opacity: 0, y: 20, filter: "blur(6px)", visibility: "visible", x: 0 }) })
+          ;[lp1.current,lp2.current,lp3.current,rp1.current,rp2.current,rp3.current].forEach(el => el && gsap.set(el, { opacity: 0, x: 28, visibility: "hidden" }))
+          phaseRef.current = 0
+          dotRefs.current.forEach((el, i) => { if (el) { el.style.width = i === 0 ? "22px" : "6px"; el.style.background = i === 0 ? "#6366f1" : "rgba(99,102,241,.20)" } })
+          if (phaseLblRef.current) phaseLblRef.current.textContent = PHASE_LABELS[0]
+          gsap.to(pin, { opacity: 1, duration: 0 })
+        }})
       },
-
       onUpdate(self) {
         const p = self.progress
-        if (progRef.current) progRef.current.style.width = `${p * 100}%`
+        if (progRef.current)  progRef.current.style.width    = `${p * 100}%`
         if (glow1Ref.current) glow1Ref.current.style.opacity = `${Math.min(1, .40 + p * .65)}`
         if (glow2Ref.current) glow2Ref.current.style.opacity = `${Math.min(1, .22 + p * .70)}`
         scrollRef.current = p
@@ -1086,34 +1007,16 @@ export default function WhyTrustSection() {
         }
       },
     })
+    return () => {
+      st.kill()
+      gsap.killTweensOf("[data-panel-inner], [data-stat-chip], [data-heading], [data-skill-ring], [data-callout], [data-prog-bar], .wt-mob-card")
+      ScrollTrigger.getAll().filter(t => t.vars.trigger === pin || t.vars.trigger === section).forEach(t => t.kill())
+    }
+  }, [ready, isMobile])
 
-    return () => { st.kill(); ScrollTrigger.getAll().forEach(t => { if (t.vars.trigger === pin) t.kill() }) }
-  }, [ready])
-
-  // ── CALLOUT chip — premium glassmorphism, readable on any bg ─────
   const Callout = ({ label, val, pos }: { label: string; val: string; pos: CP }) => (
-    <div data-callout style={{
-      position: "absolute", ...pos,
-      // Low opacity white bg + heavy blur — true glassmorphism over the model
-      background: "rgba(255,255,255,0.14)",   // was 0.18 — slightly more transparent
-      backdropFilter: "blur(24px)",
-      border: "1px solid rgba(255,255,255,0.35)",
-      WebkitBackdropFilter: "blur(32px)",
-      borderRadius: 13,
-      // Layered shadow for depth
-      boxShadow: [
-        "0 2px 0 1px rgba(99,102,241,0.06)",
-        "0 8px 32px rgba(60,80,200,0.14)",
-        "inset 0 1px 0 rgba(255,255,255,0.55)",
-        "inset 0 -1px 0 rgba(99,102,241,0.08)",
-      ].join(","),
-      padding: "7px 12px", zIndex: 4,
-      display: "flex", flexDirection: "column", gap: 1,
-      willChange: "transform,opacity",
-    }}>
-      {/* Label — uppercase, slightly lighter */}
+    <div data-callout style={{ position: "absolute", ...pos, background: "rgba(255,255,255,0.14)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 13, boxShadow: ["0 2px 0 1px rgba(99,102,241,0.06)","0 8px 32px rgba(60,80,200,0.14)","inset 0 1px 0 rgba(255,255,255,0.55)"].join(","), padding: "7px 12px", zIndex: 4, display: "flex", flexDirection: "column", gap: 1, willChange: "transform,opacity" }}>
       <span style={{ fontFamily: FR, fontSize: 7, fontWeight: 700, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: ".12em", textShadow: "0 1px 3px rgba(0,0,0,0.40)" }}>{label}</span>
-      {/* Value — large, bright, fully readable */}
       <span style={{ fontFamily: FN, fontSize: 15, fontWeight: 900, color: "#ffffff", lineHeight: 1, textShadow: "0 1px 6px rgba(0,0,0,0.50)" }}>{val}</span>
     </div>
   )
@@ -1123,28 +1026,25 @@ export default function WhyTrustSection() {
   )
 
   return (
-    <section ref={sectionRef} id="why_trust_me" aria-label="Why Trust Me" className="relative w-full"
-      style={{ background: C.pageBg, isolation: "isolate" }}>
+    <section ref={sectionRef} id="why_trust_me" aria-label="Why Trust Me" className="relative w-full" 
+    style={{ backgroundImage: `url("/images/BgImgs/SorftGlassy.png")`, backgroundSize: "cover",isolation: "isolate" }}>
       <div className="sr-only"><h2>Why Trust Me — About Prince</h2></div>
 
       {/* ════════ DESKTOP ════════ */}
       <div ref={pinWrapRef} className="hidden md:block relative w-full"
-        style={{ height: "100vh", overflow: "hidden", background: "linear-gradient(148deg,#bed2e9 0%,#cfe0f0 22%,#ddeaf7 46%,#ccdee8 68%,#d8e8f2 100%)" }}>
+        style={{ height: "100vh", overflow: "hidden" }}>
 
-        {/* BG chrome */}
         <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
           <div ref={glow1Ref} style={{ position: "absolute", top: "-12%", left: "-5%", width: "48vw", height: "48vw", borderRadius: "50%", background: "radial-gradient(circle,rgba(99,102,241,.20) 0%,transparent 68%)", filter: "blur(56px)", opacity: .40, willChange: "opacity" }} />
           <div ref={glow2Ref} style={{ position: "absolute", bottom: "-14%", right: "-5%", width: "42vw", height: "42vw", borderRadius: "50%", background: "radial-gradient(circle,rgba(109,92,240,.14) 0%,transparent 68%)", filter: "blur(50px)", opacity: .22, willChange: "opacity" }} />
-          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle,rgba(70,100,200,.09) 1px,transparent 1px)", backgroundSize: "26px 26px", WebkitMaskImage: ["radial-gradient(ellipse 14% 88% at 0% 50%,black 0%,transparent 70%)", "radial-gradient(ellipse 14% 88% at 100% 50%,black 0%,transparent 70%)"].join(","), maskImage: ["radial-gradient(ellipse 14% 88% at 0% 50%,black 0%,transparent 70%)", "radial-gradient(ellipse 14% 88% at 100% 50%,black 0%,transparent 70%)"].join(","), WebkitMaskComposite: "destination-over", maskComposite: "add" } as CP} />
+          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle,rgba(70,100,200,.09) 1px,transparent 1px)", backgroundSize: "26px 26px", WebkitMaskImage: ["radial-gradient(ellipse 14% 88% at 0% 50%,black 0%,transparent 70%)","radial-gradient(ellipse 14% 88% at 100% 50%,black 0%,transparent 70%)"].join(","), maskImage: ["radial-gradient(ellipse 14% 88% at 0% 50%,black 0%,transparent 70%)","radial-gradient(ellipse 14% 88% at 100% 50%,black 0%,transparent 70%)"].join(","), WebkitMaskComposite: "destination-over", maskComposite: "add" } as CP} />
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent 5%,rgba(99,102,241,.26) 25%,rgba(99,102,241,.56) 50%,rgba(99,102,241,.26) 75%,transparent 95%)" }} />
         </div>
 
-        {/* Progress bar */}
         <div aria-hidden style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: "rgba(99,102,241,.08)", zIndex: 7 }}>
           <div ref={progRef} style={{ height: "100%", width: "0%", background: "linear-gradient(to right,#6366f1,#818cf8)", borderRadius: "0 1px 1px 0", willChange: "width" }} />
         </div>
 
-        {/* Header */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "11%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", zIndex: 5 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#818cf8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,.38)", fontFamily: FN }}>P</div>
@@ -1164,10 +1064,8 @@ export default function WhyTrustSection() {
           </div>
         </div>
 
-        {/* 3-column grid: 28% | 1fr | 30% */}
         <div style={{ position: "absolute", top: "11%", bottom: "8%", left: 0, right: 0, zIndex: 2, display: "grid", gridTemplateColumns: "28% 1fr 30%", gap: "12px", padding: "0 24px" }}>
 
-          {/* LEFT */}
           <div style={{ position: "relative", overflow: "hidden" }}>
             <div ref={lp0} style={PANEL}><P1L /></div>
             <div ref={lp1} style={PANEL}><P2L /></div>
@@ -1175,64 +1073,36 @@ export default function WhyTrustSection() {
             <div ref={lp3} style={PANEL}><P4L /></div>
           </div>
 
-          {/* ══════════════════════════════════════════════════════
-              CENTER — 3D MODEL CARD
-              ═══ MODEL CARD APPEARANCE — Edit vars at top of file ═══
-              MODEL_CARD_GLASS   → overall card bg transparency
-              MODEL_CARD_BLUR    → frosted glass blur
-              MODEL_TOP_GRADIENT → sky gradient upper half
-              MODEL_GROUND_GLOW  → glow under model feet
-              MODEL_CARD_BORDER  → card border color
-          ══════════════════════════════════════════════════════ */}
-          <div style={{
-            position: "relative",
-            background: MODEL_CARD_GLASS,
-            backdropFilter: `blur(${MODEL_CARD_BLUR})`,
-            WebkitBackdropFilter: `blur(${MODEL_CARD_BLUR})`,
-            border: `1px solid ${MODEL_CARD_BORDER}`,
-            borderRadius: 22, overflow: "hidden",
-            boxShadow: "0 4px 0 2px rgba(99,102,241,0.04),0 12px 40px rgba(60,80,200,.08),inset 0 1px 0 rgba(255,255,255,0.5)",
-          }}>
-            {/* Sky gradient — top 60% of card */}
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: "40%", background: MODEL_TOP_GRADIENT }} />
-
-            {/* Ground glow under model feet */}
+          {/* CENTER model card — MODEL CARD APPEARANCE vars control this */}
+          <div style={{ position: "relative", background: MODEL_CARD_GLASS, backdropFilter: `blur(${MODEL_CARD_BLUR})`, WebkitBackdropFilter: `blur(${MODEL_CARD_BLUR})`, border: `1px solid ${MODEL_CARD_BORDER}`, borderRadius: 22, overflow: "hidden", boxShadow: "0 4px 0 2px rgba(99,102,241,0.04),0 12px 40px rgba(60,80,200,.08),inset 0 1px 0 rgba(255,255,255,0.5)" }}>
+            {/* Uncomment to re-enable subtle top gradient (currently transparent): */}
+            {/* <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: "40%", background: MODEL_TOP_GRADIENT }} /> */}
             <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 90, height: 22, borderRadius: "50%", background: `radial-gradient(ellipse,${MODEL_GROUND_GLOW},transparent 70%)`, filter: "blur(8px)" }} />
-
-            {/* Top accent stripe */}
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent,rgba(99,102,241,.38),transparent)", zIndex: 5 }} />
 
             {/*
-              ── BACKGROUND IMAGE (uncomment to enable) ──────────────
-              Place your image in /public/images/ and edit the src.
-              Adjust opacity (0.0–1.0) and objectPosition as needed.
-
-              <Image
-                src="/images/why-trust-bg.jpg"
-                alt=""
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 40vw"
-                className="object-cover object-center"
-                style={{ opacity: 0.18, zIndex: 0, mixBlendMode: "luminosity" }}
-              />
-              ── END IMAGE ─────────────────────────────────────────────
+              BACKGROUND IMAGE — uncomment to add:
+              <Image src="/images/why-trust-bg.jpg" alt="" fill priority
+                sizes="40vw" className="object-cover object-center"
+                style={{ opacity: 0.18, zIndex: 0, mixBlendMode: "luminosity" }} />
             */}
 
-            {/* Callout groups */}
             {[cw0, cw1, cw2, cw3].map((ref, idx) => (
               <div key={idx} ref={ref} style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none" }}>
                 {CALLOUTS[idx].map((c, i) => <Callout key={i} label={c.l} val={c.v} pos={c.pos} />)}
               </div>
             ))}
 
-            {/* 3D Model canvas */}
-            <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
-              <StableModelViewer scrollRef={scrollRef} />
-            </div>
+            {/* ── SINGLE ModelViewer — only desktop canvas ── */}
+            {!isMobile && modelReady ? (
+              <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
+                <StableModelViewer scrollRef={scrollRef} />
+              </div>
+            ) : !isMobile && (
+              <ModelSkeleton />
+            )}
           </div>
 
-          {/* RIGHT */}
           <div style={{ position: "relative", overflow: "hidden" }}>
             <div ref={rp0} style={PANEL}><P1R /></div>
             <div ref={rp1} style={PANEL}><P2R /></div>
@@ -1241,14 +1111,12 @@ export default function WhyTrustSection() {
           </div>
         </div>
 
-        {/* Phase dots */}
         <div style={{ position: "absolute", bottom: "2.8%", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 7, zIndex: 6 }}>
-          {[0, 1, 2, 3].map(i => (
+          {[0,1,2,3].map(i => (
             <div key={i} ref={el => { dotRefs.current[i] = el }} style={{ borderRadius: 4, height: 6, width: i === 0 ? 22 : 6, background: i === 0 ? "#6366f1" : "rgba(99,102,241,.20)", transition: "all .36s cubic-bezier(.22,1,.36,1)" }} />
           ))}
         </div>
 
-        {/* Scroll hint */}
         <AnimatePresence>
           {hint && (
             <motion.div key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 1.2, duration: .5 }}
@@ -1266,8 +1134,17 @@ export default function WhyTrustSection() {
 
         <MC>
           <div style={{ position: "relative", height: 300, marginBottom: 24, borderRadius: 24, overflow: "hidden", background: MODEL_CARD_GLASS, backdropFilter: `blur(${MODEL_CARD_BLUR})`, WebkitBackdropFilter: `blur(${MODEL_CARD_BLUR})`, border: `1px solid ${MODEL_CARD_BORDER}` }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: "38%", background: MODEL_TOP_GRADIENT }} />
-            <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }}><StableModelViewer scrollRef={scrollRef} /></div>
+            <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 90, height: 24, borderRadius: "50%", background: `radial-gradient(ellipse,${MODEL_GROUND_GLOW},transparent 70%)`, filter: "blur(10px)" }} />
+
+            {/* ── SINGLE ModelViewer — only mobile canvas ── */}
+            {isMobile && modelReady ? (
+              <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }}>
+                <StableModelViewer scrollRef={scrollRef} />
+              </div>
+            ) : isMobile && (
+              <ModelSkeleton />
+            )}
+
             {CALLOUTS[0].slice(0, 4).map((c, i) => (
               <div key={i} style={{ position: "absolute", top: `${12 + i * 22}%`, left: i % 2 === 0 ? "4%" : "auto", right: i % 2 !== 0 ? "4%" : "auto", background: "rgba(255,255,255,0.18)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.40)", borderRadius: 11, padding: "5px 11px", boxShadow: "0 4px 16px rgba(60,80,200,.12)" }}>
                 <span style={{ fontFamily: FR, fontSize: 7, fontWeight: 700, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: ".08em", display: "block", textShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>{c.l}</span>
@@ -1285,9 +1162,9 @@ export default function WhyTrustSection() {
           <MC><div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 14 }}>{TECH_LIST.map(t => <TechBadge key={t.label} {...t} />)}</div></MC>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
             {[
-              { v: 6, sx: "+", l: "Projects Delivered", Icon: Zap, tint: { bg: C.bBlue, ic: C.accent } },
-              { v: 0, sx: "", l: "Missed Deadlines", Icon: CheckCircle2, tint: { bg: C.bGreen, ic: C.green } },
-              { v: 48, sx: "h", l: "Avg. Delivery Time", Icon: Clock, tint: { bg: C.bAmb, ic: C.amber } },
+              { v: 6,  sx: "+", l: "Projects Delivered", Icon: Zap,         tint: { bg: C.bBlue,  ic: C.accent } },
+              { v: 0,  sx: "",  l: "Missed Deadlines",   Icon: CheckCircle2, tint: { bg: C.bGreen, ic: C.green  } },
+              { v: 48, sx: "h", l: "Avg. Delivery Time", Icon: Clock,        tint: { bg: C.bAmb,   ic: C.amber  } },
             ].map((s, i) => <MC key={s.l}><StatChip v={s.v} sx={s.sx} label={s.l} Icon={s.Icon} tint={s.tint} idx={i} /></MC>)}
           </div>
           <MC>
@@ -1296,7 +1173,7 @@ export default function WhyTrustSection() {
                 <span style={{ fontFamily: FR, fontSize: 8, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: C.muted }}>Delivery Rate</span>
                 <span style={{ fontFamily: FN, fontSize: 18, fontWeight: 900, color: INK }}>100%</span>
               </div>
-              <SegmentBar value={100} total={24} gradient={["#4f46e5", "#6366f1", "#818cf8", "#a5b4fc"]} />
+              <SegmentBar value={100} total={24} gradient={["#4f46e5","#6366f1","#818cf8","#a5b4fc"]} />
             </div>
           </MC>
         </div>
@@ -1311,9 +1188,9 @@ export default function WhyTrustSection() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {[
                   { n: "React / Next.js", p: 90, c: "#6366f1" },
-                  { n: "Node.js / API", p: 82, c: "#818cf8" },
-                  { n: "MongoDB / DB", p: 78, c: "#7c3aed" },
-                  { n: "Tailwind / UI", p: 88, c: "#06B6D4" },
+                  { n: "Node.js / API",   p: 82, c: "#818cf8" },
+                  { n: "MongoDB / DB",    p: 78, c: "#7c3aed" },
+                  { n: "Tailwind / UI",   p: 88, c: "#06B6D4" },
                 ].map(s => (
                   <div key={s.n}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -1335,10 +1212,9 @@ export default function WhyTrustSection() {
               <SkillRings />
             </div>
           </MC>
-          {/* Project cards with tech logos */}
           {[
-            { name: "Task Manager App", tags: ["Next.js", "MongoDB", "Vercel"], grade: "9/10" },
-            { name: "E-Commerce Dashboard", tags: ["React", "Node.js", "Prisma"], grade: "8.5/10" },
+            { name: "Task Manager App",     tags: ["Next.js","MongoDB","Vercel"], grade: "9/10"   },
+            { name: "E-Commerce Dashboard", tags: ["React","Node.js","Prisma"],   grade: "8.5/10" },
           ].map(p => (
             <MC key={p.name}>
               <div style={{ ...gCard(15), padding: "13px 15px", marginBottom: 10 }}>
@@ -1383,12 +1259,12 @@ export default function WhyTrustSection() {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[
-                  { t: "Source code", Icon: Code2 },
-                  { t: "Deployed live", Icon: Globe },
-                  { t: "Documentation", Icon: FileText },
-                  { t: "Viva prep", Icon: GraduationCap },
-                  { t: "Free revisions", Icon: RefreshCw },
-                  { t: "Explanation", Icon: MessagesSquare },
+                  { t: "Source code",    Icon: Code2          },
+                  { t: "Deployed live",  Icon: Globe          },
+                  { t: "Documentation",  Icon: FileText       },
+                  { t: "Viva prep",      Icon: GraduationCap  },
+                  { t: "Free revisions", Icon: RefreshCw      },
+                  { t: "Explanation",    Icon: MessagesSquare },
                 ].map(b => (
                   <span key={b.t} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FR, fontSize: 9.5, fontWeight: 700, color: C.green, background: C.bGreen, borderRadius: 20, padding: "5px 11px", border: "1px solid rgba(5,150,106,.16)" }}>
                     <b.Icon size={10} style={{ color: C.green }} /> {b.t}

@@ -1,7 +1,7 @@
 "use client"
 
-import React from 'react'
-import { motion } from 'motion/react'
+import React, { useEffect } from 'react'
+import { motion } from 'framer-motion'
 import HeroSection from '@/components/sections/HeroSection'
 import ServicesSection from '@/components/sections/ServicesSection'
 import DemoSection from '@/components/sections/DemoSection'
@@ -13,6 +13,10 @@ import SectionConnector from '@/components/SectionConnector'
 import Header from '../components/Navbar'
 import { SmoothCursor } from '@/components/ui/smooth-cursor'
 import WhyTrustSection from '@/components/sections/WhyTrustSection'
+import gsap from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
+import FAQSection from '@/components/sections/FAQSection'
+import KeyBoardSearchSection from '@/components/sections/KeyBoardSearchSection'
 
 
 function page() {
@@ -20,12 +24,22 @@ function page() {
     initial: { opacity: 0, y: 20 },
     whileInView: { opacity: 1, y: 0 },
     viewport: { once: true, amount: 0.1, margin: "-50px" },
-    transition: { duration: 0.6, ease: "easeOut" as const }
+    transition: { duration: 0.6, ease: "easeOut" }
   }
+
+  // CONDITION 5: Browser scroll restoration causing mid-page start on refresh
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.history.scrollRestoration = "manual"
+      window.scrollTo(0, 0)
+    }
+    const t = setTimeout(() => ScrollTrigger.refresh(true), 400)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <>
-      <main className="overflow-hidden scroll-smooth cursor-none  bg-[#F2F5FE]">
+      <main className="flex flex-col min-h-screen overflow-x-hidden cursor-none bg-[#F2F5FE]">
         <SmoothCursor />
         <Header />
         {/* Hero section should be visible immediately */}
@@ -44,6 +58,10 @@ function page() {
         />
 
         <SectionConnector from="#F9FBFF" to="#F9FBFF" glow={false} />
+
+        <motion.section id="keyBoard" {...motionProps} className="pb-0">
+          <KeyBoardSearchSection  />
+        </motion.section>
 
         <motion.section id="services" {...motionProps} className="pb-0">
           <ServicesSection />
@@ -82,6 +100,12 @@ function page() {
         <section id="why_trust_me" className="relative z-40 bg-[#F9FBFF]">
           <motion.section {...motionProps}>
             <WhyTrustSection />
+          </motion.section>
+        </section>
+
+        <section id="faq" className="relative z-40 bg-[#F9FBFF]">
+          <motion.section {...motionProps}>
+            <FAQSection />
           </motion.section>
         </section>
 
